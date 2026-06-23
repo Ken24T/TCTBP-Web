@@ -78,6 +78,7 @@ async function main(cliOptions) {
   logItem("Target", answers.targetPath);
   logItem("Working branch", answers.workingBranch);
   logItem("Strategy", answers.branchStrategy);
+  logItem("Framework", answers.framework);
   logItem("Deploy target", answers.deployTarget);
   logItem("Test framework", answers.testFramework);
 
@@ -108,6 +109,7 @@ async function interview(cliOptions) {
   const targetPath = cliOptions.target || await ask("Target directory (absolute path): ");
   const workingBranch = cliOptions.working || await ask(`Working branch name [development]: `) || "development";
   const branchStrategy = cliOptions.strategy || await ask(`Branch strategy: staged (development→staging→main) or simple (main only) [staged]: `) || "staged";
+  const framework = cliOptions.framework || await ask(`Framework: vite (React+TS), or none [vite]: `) || "vite";
   const deployTarget = cliOptions.deploy || await ask(`Deploy target: Vercel, Netlify, Cloudflare Pages, Docker, or none yet [none yet]: `) || "none yet";
   const testFramework = cliOptions.test || await ask(`Test framework: vitest, jest, or none [vitest]: `) || "vitest";
 
@@ -118,6 +120,7 @@ async function interview(cliOptions) {
     targetPath: path.resolve(targetPath.trim()),
     workingBranch: workingBranch.trim() || "development",
     branchStrategy: branchStrategy.trim() || "staged",
+    framework: framework.trim() || "vite",
     deployTarget: deployTarget.trim() || "none yet",
     testFramework: testFramework.trim() || "vitest",
   };
@@ -129,6 +132,7 @@ function getDefaultAnswers() {
     targetPath: path.resolve(process.cwd(), "my-web-app"),
     workingBranch: "development",
     branchStrategy: "staged",
+    framework: "vite",
     deployTarget: "none yet",
     testFramework: "vitest",
   };
@@ -160,6 +164,10 @@ function validateAnswers(answers) {
 
   if (!["staged", "simple"].includes(answers.branchStrategy)) {
     fail("Branch strategy must be 'staged' or 'simple'.");
+  }
+
+  if (!["vite", "none"].includes(answers.framework)) {
+    fail("Framework must be 'vite' or 'none'.");
   }
 
   const validDeployTargets = ["vercel", "netlify", "cloudflare pages", "docker", "none yet"];
@@ -210,11 +218,6 @@ function substitute(template, answers) {
     testDevDeps = `"jest": "^29.0.0",\n    "@types/jest": "^29.0.0",\n    "ts-jest": "^29.0.0",\n    `;
   }
 
-  let quickStart = "Run `npm run typecheck` to validate TypeScript.";
-  if (hasTests) {
-    quickStart += ` Run \`npm run test\` to run the test suite.`;
-  }
-
   let branchDiagram = "";
   let branchStrategyDesc = "";
   if (isStaged) {
@@ -229,15 +232,45 @@ function substitute(template, answers) {
   if (hasTests) scriptList += `- \`npm run test\` — Run tests (${answers.testFramework})\n`;
   if (hasTests) scriptList += `- \`npm run test:watch\` — Run tests in watch mode\n`;
 
-  let frameworkGuidance = "No framework selected yet. Update this section when you add React, Next.js, Vue, Svelte, or another framework.";
-  if (answers.deployTarget.toLowerCase() === "vercel") {
-    frameworkGuidance = "Deploy target is Vercel. Prefer serverless-compatible patterns. Keep cold-start times low. Use Edge Functions where appropriate.";
-  } else if (answers.deployTarget.toLowerCase() === "netlify") {
-    frameworkGuidance = "Deploy target is Netlify. Prefer serverless-compatible patterns. Netlify Functions and Edge Functions are available.";
-  } else if (answers.deployTarget.toLowerCase() === "cloudflare pages") {
-    frameworkGuidance = "Deploy target is Cloudflare Pages. Use Cloudflare Workers and Pages Functions. Be mindful of the Workers runtime limitations.";
-  } else if (answers.deployTarget.toLowerCase() === "docker") {
-    frameworkGuidance = "Deploy target is Docker. Build for containerized environments. Keep images small. Use multi-stage builds.";
+  const hasVite = answers.framework === "vite";
+  let frameworkScripts = "";
+  let frameworkDeps = "";
+  let frameworkDevDeps = "";
+  let frameworkGuidance = "";
+  let quickStart = "";
+
+  if (hasVite) {
+    frameworkScripts = `"dev": "vite",\n    "build": "tsc -b && vite build",\n    "preview": "vite preview",\n    `;
+    frameworkDeps = `"react": "^19.0.0",\n    "react-dom": "^19.0.0"\n    `;
+    frameworkDevDeps = `"vite": "^6.0.0",\n    "@vitejs/plugin-react": "^4.0.0",\n    "@types/react": "^19.0.0",\n    "@types/react-dom": "^19.0.0",\n    `;
+    quickStart = "Run `npm run dev` to start the Vite dev server. ";
+    quickStart += "Run `npm run typecheck` to validate TypeScript. ";
+    if (hasTests) quickStart += "Run `npm run test` to run the test suite.";
+    frameworkGuidance = `## Framework: Vite + React + TypeScript
+
+- **Dev server:** \`npm run dev\` (Vite on port 5173)
+- **Build:** \`npm run build\` (TypeScript → Vite production bundle)
+- **Component pattern:** One component per file in \`src/\`. Use function components with hooks.
+- **Styling:** CSS imports. Add Tailwind or CSS modules as needed.
+- **Routing:** Add \`react-router-dom\` when routes are needed.
+- **State:** Use React hooks (\`useState\`, \`useReducer\`). Add Zustand or Context for shared state.`;
+  } else {
+    quickStart = "Run `npm run typecheck` to validate TypeScript. ";
+    if (hasTests) quickStart += "Run `npm run test` to run the test suite. ";
+    frameworkGuidance = "No framework selected yet. Update this section when you add React, Next.js, Vue, Svelte, or another framework.";
+  }
+
+  let deployGuidance = "";
+  if (hasVite) {
+    if (answers.deployTarget.toLowerCase() === "vercel") {
+      deployGuidance = "Deploy target is Vercel with Vite. Use the Vercel adapter or static export. Configure `vite.config.ts` for serverless if using SSR.";
+    } else if (answers.deployTarget.toLowerCase() === "netlify") {
+      deployGuidance = "Deploy target is Netlify with Vite. Use \`npm run build\` as the build command and \`dist/\` as the publish directory.";
+    } else if (answers.deployTarget.toLowerCase() === "cloudflare pages") {
+      deployGuidance = "Deploy target is Cloudflare Pages with Vite. Set build command to \`npm run build\` and output directory to \`dist/\`.";
+    } else if (answers.deployTarget.toLowerCase() === "docker") {
+      deployGuidance = "Deploy target is Docker with Vite. Use multi-stage builds — Vite for the static build, nginx for serving.";
+    }
   }
 
   let branchModelNote = "";
@@ -267,10 +300,14 @@ This project uses the **simple branch model**: \`main\` only. All work happens o
   result = result.replace(/\{\{BRANCH_DIAGRAM\}\}/g, branchDiagram);
   result = result.replace(/\{\{SCRIPT_LIST\}\}/g, scriptList);
   result = result.replace(/\{\{FRAMEWORK_GUIDANCE\}\}/g, frameworkGuidance);
+  result = result.replace(/\{\{DEPLOY_GUIDANCE\}\}/g, deployGuidance);
   result = result.replace(/\{\{BRANCH_MODEL_NOTE\}\}/g, branchModelNote);
   result = result.replace(/\{\{TEST_FRAMEWORK\}\}/g, hasTests ? answers.testFramework : "none");
   result = result.replace(/\{\{WORKING_BRANCH\}\}/g, answers.workingBranch);
   result = result.replace(/\{\{DEPLOY_TARGET\}\}/g, answers.deployTarget);
+  result = result.replace(/\{\{FRAMEWORK_SCRIPTS\}\}/g, frameworkScripts);
+  result = result.replace(/\{\{FRAMEWORK_DEPS\}\}/g, frameworkDeps);
+  result = result.replace(/\{\{FRAMEWORK_DEV_DEPS\}\}/g, frameworkDevDeps);
 
   return result;
 }
@@ -288,12 +325,30 @@ function writeProjectSkeleton(answers) {
   writeTemplate(tpl("README.md.template"), path.join(answers.targetPath, "README.md"), answers);
   writeTemplate(tpl("copilot-instructions.md.template"), path.join(answers.targetPath, ".github", "copilot-instructions.md"), answers);
 
+  if (answers.framework === "vite") {
+    writeViteTemplates(answers);
+  }
+
   if (answers.testFramework === "vitest") {
     writeTemplate(tpl("vitest.config.ts.template"), path.join(answers.targetPath, "vitest.config.ts"), answers);
     writeTemplate(tpl("src/placeholder.test.ts.template"), path.join(answers.targetPath, "src", "placeholder.test.ts"), answers);
   }
 
   console.log("Wrote project skeleton files.");
+}
+
+function writeViteTemplates(answers) {
+  const viteTpl = (name) => path.join(TEMPLATES_DIR, "vite", name);
+  writeTemplate(viteTpl("index.html.template"), path.join(answers.targetPath, "index.html"), answers);
+  writeTemplate(viteTpl("vite.config.ts.template"), path.join(answers.targetPath, "vite.config.ts"), answers);
+  writeTemplate(viteTpl("src/main.tsx.template"), path.join(answers.targetPath, "src", "main.tsx"), answers);
+  writeTemplate(viteTpl("src/App.tsx.template"), path.join(answers.targetPath, "src", "App.tsx"), answers);
+  writeTemplate(viteTpl("src/vite-env.d.ts.template"), path.join(answers.targetPath, "src", "vite-env.d.ts"), answers);
+  // Remove the bare-TS placeholder test — Vite projects don't need it
+  const placeholderTest = path.join(answers.targetPath, "src", "placeholder.test.ts");
+  if (fs.existsSync(placeholderTest)) {
+    fs.unlinkSync(placeholderTest);
+  }
 }
 
 function writeTemplate(templatePath, targetPath, answers) {
@@ -353,6 +408,7 @@ function copyPrompts(targetPath) {
 function generateProfile(answers) {
   const isStaged = answers.branchStrategy === "staged";
   const hasTests = answers.testFramework !== "none";
+  const hasVite = answers.framework === "vite";
   const deployTarget = answers.deployTarget.toLowerCase();
 
   const profile = {
@@ -393,14 +449,14 @@ function generateProfile(answers) {
         format: null,
         test: hasTests ? "npm run test" : null,
         lint: null,
-        build: null,
+        build: hasVite ? "npm run build" : null,
         releaseBuild: null,
       },
       qualityGates: {
         requireZeroProblems: true,
         requireTestsBeforeShip: hasTests,
         requireLintBeforeShip: false,
-        requireBuildBeforeShip: false,
+        requireBuildBeforeShip: hasVite,
       },
       versioning: {
         sourceOfTruth: "package.json",
@@ -408,8 +464,8 @@ function generateProfile(answers) {
         formatAfterBump: false,
       },
       devServer: {
-        port: 5173,
-        label: "Vite dev server",
+        port: hasVite ? 5173 : null,
+        label: hasVite ? "Vite dev server" : null,
       },
       developmentPolicy: {
         maxFileLines: {
@@ -702,6 +758,7 @@ function printDryRun(answers) {
   console.log(`Would create project '${answers.projectName}' at ${answers.targetPath}`);
   console.log(`Working branch: ${answers.workingBranch}`);
   console.log(`Strategy: ${answers.branchStrategy}`);
+  console.log(`Framework: ${answers.framework}`);
   console.log(`Deploy target: ${answers.deployTarget}`);
   console.log(`Test framework: ${answers.testFramework}`);
   console.log("Would run: npm install (use --skip-install to preview without it)");
@@ -760,6 +817,7 @@ function parseArgs(args) {
       case "--target": result.target = args[++i]; break;
       case "--working": result.working = args[++i]; break;
       case "--strategy": result.strategy = args[++i]; break;
+      case "--framework": result.framework = args[++i]; break;
       case "--deploy": result.deploy = args[++i]; break;
       case "--test": result.test = args[++i]; break;
       case "--remote": result.remote = args[++i]; break;
@@ -775,7 +833,7 @@ function parseArgs(args) {
 }
 
 function printUsage(exitCode) {
-  console.log("Usage: node scripts/tctbp-run-scaffold.js [--name <name>] [--target <path>] [--working <branch>] [--strategy staged|simple] [--deploy <target>] [--test vitest|jest|none] [--remote <url>] [--defaults] [--dry-run] [--skip-install] [--skip-remote] [--list]");
+  console.log("Usage: node scripts/tctbp-run-scaffold.js [--name <name>] [--target <path>] [--working <branch>] [--strategy staged|simple] [--framework vite|none] [--deploy <target>] [--test vitest|jest|none] [--remote <url>] [--defaults] [--dry-run] [--skip-install] [--skip-remote] [--list]");
   process.exit(exitCode || 0);
 }
 

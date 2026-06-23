@@ -21,6 +21,7 @@ async function interview(cliOptions) {
   const targetPath = cliOptions.target || await ask("Target directory (absolute path): ");
   const workingBranch = cliOptions.working || await ask("Working branch name [development]: ") || "development";
   const branchStrategy = cliOptions.strategy || await ask("Branch strategy: staged (development→staging→main) or simple (main only) [staged]: ") || "staged";
+  const framework = cliOptions.framework || await ask("Framework: vite (React+TS), next, vue, svelte, or none [vite]: ") || "vite";
   const deployTarget = cliOptions.deploy || await ask("Deploy target: Vercel, Netlify, Cloudflare Pages, Docker, or none yet [none yet]: ") || "none yet";
   const testFramework = cliOptions.test || await ask("Test framework: vitest, jest, or none [vitest]: ") || "vitest";
 
@@ -31,6 +32,7 @@ async function interview(cliOptions) {
     targetPath: path.resolve(targetPath.trim()),
     workingBranch: workingBranch.trim() || "development",
     branchStrategy: branchStrategy.trim() || "staged",
+    framework: framework.trim() || "vite",
     deployTarget: deployTarget.trim() || "none yet",
     testFramework: testFramework.trim() || "vitest",
   };
@@ -42,6 +44,7 @@ function getDefaultAnswers() {
     targetPath: path.resolve(process.cwd(), "my-web-app"),
     workingBranch: "development",
     branchStrategy: "staged",
+    framework: "vite",
     deployTarget: "none yet",
     testFramework: "vitest",
   };
@@ -71,6 +74,10 @@ function validateAnswers(answers) {
 
   if (!["staged", "simple"].includes(answers.branchStrategy)) {
     fail("Branch strategy must be 'staged' or 'simple'.");
+  }
+
+  if (!["vite", "none"].includes(answers.framework)) {
+    fail("Framework must be 'vite' or 'none'.");
   }
 
   const validDeployTargets = ["vercel", "netlify", "cloudflare pages", "docker", "none yet"];

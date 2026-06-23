@@ -35,6 +35,8 @@ Every file should have one clear purpose expressible in a single sentence. If yo
 
 {{FRAMEWORK_GUIDANCE}}
 
+{{DEPLOY_GUIDANCE}}
+
 General rules that apply regardless of framework:
 
 - Prefer `const` over `let`. Never use `var`.

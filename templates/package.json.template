@@ -4,10 +4,15 @@
   "version": "0.1.0",
   "description": "{{PROJECT_DESCRIPTION}}",
   "scripts": {
+    {{FRAMEWORK_SCRIPTS}}
     {{TEST_SCRIPTS}}
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    {{FRAMEWORK_DEPS}}
+  },
   "devDependencies": {
+    {{FRAMEWORK_DEV_DEPS}}
     {{TEST_DEV_DEPENDENCIES}}
     "typescript": "^5.0.0"
   }

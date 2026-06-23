@@ -655,8 +655,13 @@ async function setupGitRemote(answers, cliOptions) {
     return;
   }
 
+  const branchNames = answers.branchStrategy === "staged"
+    ? [answers.workingBranch, "staging", "main"]
+    : ["main"];
+
   if (cliOptions.remote) {
-    setRemote(answers.targetPath, cliOptions.remote);
+    setRemote(answers.targetPath, cliOptions.remote, branchNames);
+    cliOptions.remoteWasSet = true;
     return;
   }
 
@@ -671,11 +676,13 @@ async function setupGitRemote(answers, cliOptions) {
   rl.close();
 
   if (remoteUrl.trim()) {
-    setRemote(answers.targetPath, remoteUrl.trim());
+    setRemote(answers.targetPath, remoteUrl.trim(), branchNames);
+    cliOptions.remote = remoteUrl.trim();
+    cliOptions.remoteWasSet = true;
   }
 }
 
-function setRemote(targetPath, url) {
+function setRemote(targetPath, url, branchNames) {
   console.log(`Setting git remote origin → ${url}`);
   const result = spawnSync("git", ["remote", "add", "origin", url], {
     cwd: targetPath,
@@ -684,8 +691,22 @@ function setRemote(targetPath, url) {
 
   if (result.error || result.status !== 0) {
     console.log("  ✗ Failed to set git remote. Add it manually: git remote add origin <url>");
+    return;
+  }
+
+  console.log("  ✓ Git remote origin set");
+
+  // Push all branches to origin
+  console.log("Pushing initial scaffold to origin...");
+  const pushResult = spawnSync("git", ["push", "-u", "origin", ...branchNames], {
+    cwd: targetPath,
+    stdio: "inherit"
+  });
+
+  if (pushResult.error || pushResult.status !== 0) {
+    console.log("  ✗ Push failed. Push manually: git push -u origin " + branchNames.join(" "));
   } else {
-    console.log("  ✓ Git remote origin set");
+    console.log("  ✓ Initial scaffold pushed to origin");
   }
 }
 
@@ -730,23 +751,31 @@ function printSummary(answers, cliOptions) {
   console.log(`Project: ${answers.projectName}`);
   console.log(`Location: ${answers.targetPath}`);
   console.log(`Branch: ${answers.branchStrategy === "staged" ? answers.workingBranch : "main"} (current)`);
+  console.log(`Framework: ${answers.framework === "vite" ? "Vite + React + TypeScript" : "none"}`);
   console.log(`Deploy: ${answers.deployTarget}`);
   console.log(`Tests: ${answers.testFramework}`);
 
-  console.log("\nNext steps:");
+  if (cliOptions.remoteWasSet) {
+    console.log(`Remote: origin → ${cliOptions.remote}`);
+  }
+
+  console.log("\nQuick start:");
   if (cliOptions.skipInstall) {
-    console.log(`  1. cd ${answers.targetPath} && npm install`);
-  } else {
-    console.log(`  1. cd ${answers.targetPath}     (dependencies already installed)`);
+    console.log(`  cd ${answers.targetPath} && npm install`);
+  }
+  if (answers.framework === "vite") {
+    console.log("  npm run dev             # start Vite dev server on :5173");
   }
   if (answers.testFramework !== "none") {
-    console.log("  2. npm run test          # verify the test runner works");
+    console.log("  npm run test            # run the test suite");
   }
-  console.log("  3. Add your framework (vite, next, etc.) and start coding");
-  console.log("  4. Update TCTBP.json commands when you add scripts");
+  console.log("  npm run typecheck       # validate TypeScript");
+  console.log("");
+  console.log("When you're ready:");
   if (answers.branchStrategy === "staged") {
-    console.log(`  5. git checkout ${answers.workingBranch} (you should already be there)`);
+    console.log("  code, checkpoint, publish on development → promote staging → promote production → ship");
   }
+  console.log("  Update TCTBP.json commands when you add lint/format scripts.");
 
   if (answers.deployTarget !== "none yet") {
     console.log(`\nDeploy setup: configure the deployCommand in .github/TCTBP.json for your ${answers.deployTarget} targets.`);
@@ -762,8 +791,7 @@ function printDryRun(answers) {
   console.log(`Deploy target: ${answers.deployTarget}`);
   console.log(`Test framework: ${answers.testFramework}`);
   console.log("Would run: npm install (use --skip-install to preview without it)");
-  console.log("Would prompt: Git remote URL (use --remote <url> or --skip-remote)");
-  console.log("\nNo files or directories were created.");
+  console.log("Would prompt: Git remote URL (use --remote <url> or --skip-remote)");  console.log("If remote is set: would push all branches to origin");  console.log("\nNo files or directories were created.");
 }
 
 // ---------------------------------------------------------------------------

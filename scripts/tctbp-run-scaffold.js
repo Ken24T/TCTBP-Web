@@ -36,7 +36,6 @@ const GITHUB_FILES = [
   "agents/TCTBP.agent.md",
   "TCTBP Agent.md",
   "TCTBP Cheatsheet.md",
-  "copilot-instructions.md",
   "hooks/tctbp-safety.json",
 ];
 
@@ -222,6 +221,34 @@ function substitute(template, answers) {
   if (hasTests) scriptList += `- \`npm run test\` — Run tests (${answers.testFramework})\n`;
   if (hasTests) scriptList += `- \`npm run test:watch\` — Run tests in watch mode\n`;
 
+  let frameworkGuidance = "No framework selected yet. Update this section when you add React, Next.js, Vue, Svelte, or another framework.";
+  if (answers.deployTarget.toLowerCase() === "vercel") {
+    frameworkGuidance = "Deploy target is Vercel. Prefer serverless-compatible patterns. Keep cold-start times low. Use Edge Functions where appropriate.";
+  } else if (answers.deployTarget.toLowerCase() === "netlify") {
+    frameworkGuidance = "Deploy target is Netlify. Prefer serverless-compatible patterns. Netlify Functions and Edge Functions are available.";
+  } else if (answers.deployTarget.toLowerCase() === "cloudflare pages") {
+    frameworkGuidance = "Deploy target is Cloudflare Pages. Use Cloudflare Workers and Pages Functions. Be mindful of the Workers runtime limitations.";
+  } else if (answers.deployTarget.toLowerCase() === "docker") {
+    frameworkGuidance = "Deploy target is Docker. Build for containerized environments. Keep images small. Use multi-stage builds.";
+  }
+
+  let branchModelNote = "";
+  if (isStaged) {
+    branchModelNote = `## Branch Model
+
+This project uses the **staged branch model**: \`${answers.workingBranch}\` → \`staging\` → \`main\`.
+
+- \`${answers.workingBranch}\` — Active development. Checkpoint and publish freely.
+- \`staging\` — Field-testing and review. Promote from \`${answers.workingBranch}\` before deploying staging.
+- \`main\` — Production. Promote from \`staging\`, then ship and deploy.
+
+Never commit directly to \`staging\` or \`main\`. Always promote through the chain.`;
+  } else {
+    branchModelNote = `## Branch Model
+
+This project uses the **simple branch model**: \`main\` only. All work happens on \`main\` or short-lived feature branches that merge back into \`main\`.`;
+  }
+
   let result = template;
   result = result.replace(/\{\{PROJECT_NAME\}\}/g, answers.projectName);
   result = result.replace(/\{\{PROJECT_DESCRIPTION\}\}/g, `A web application built with the TCTBP-Web workflow.`);
@@ -231,6 +258,11 @@ function substitute(template, answers) {
   result = result.replace(/\{\{BRANCH_STRATEGY_DESCRIPTION\}\}/g, branchStrategyDesc);
   result = result.replace(/\{\{BRANCH_DIAGRAM\}\}/g, branchDiagram);
   result = result.replace(/\{\{SCRIPT_LIST\}\}/g, scriptList);
+  result = result.replace(/\{\{FRAMEWORK_GUIDANCE\}\}/g, frameworkGuidance);
+  result = result.replace(/\{\{BRANCH_MODEL_NOTE\}\}/g, branchModelNote);
+  result = result.replace(/\{\{TEST_FRAMEWORK\}\}/g, hasTests ? answers.testFramework : "none");
+  result = result.replace(/\{\{WORKING_BRANCH\}\}/g, answers.workingBranch);
+  result = result.replace(/\{\{DEPLOY_TARGET\}\}/g, answers.deployTarget);
 
   return result;
 }
@@ -246,6 +278,7 @@ function writeProjectSkeleton(answers) {
   writeTemplate(tpl("tsconfig.json.template"), path.join(answers.targetPath, "tsconfig.json"), answers);
   writeTemplate(tpl(".gitignore.template"), path.join(answers.targetPath, ".gitignore"), answers);
   writeTemplate(tpl("README.md.template"), path.join(answers.targetPath, "README.md"), answers);
+  writeTemplate(tpl("copilot-instructions.md.template"), path.join(answers.targetPath, ".github", "copilot-instructions.md"), answers);
 
   if (answers.testFramework === "vitest") {
     writeTemplate(tpl("vitest.config.ts.template"), path.join(answers.targetPath, "vitest.config.ts"), answers);
@@ -369,6 +402,23 @@ function generateProfile(answers) {
       devServer: {
         port: 5173,
         label: "Vite dev server",
+      },
+      developmentPolicy: {
+        maxFileLines: {
+          softCeiling: 250,
+          warningThreshold: 400,
+          hardSplit: 600,
+        },
+        modularity: {
+          preferModularFiles: true,
+          extractAtFunctionGroupSize: 3,
+          maxImportsPerModule: 8,
+        },
+        functionRules: {
+          maxLines: 40,
+          preferPure: true,
+          noAnyInExportedSignatures: true,
+        },
       },
     },
     activation: {

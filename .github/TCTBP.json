@@ -69,6 +69,26 @@
       "port": null,
       "label": null,
       "comment": "Set devServer.port and devServer.label when the project adds a dev server (e.g. Vite on 5173). The runtime advisory in handover will check this port."
+    },
+    "developmentPolicy": {
+      "maxFileLines": {
+        "softCeiling": 250,
+        "warningThreshold": 400,
+        "hardSplit": 600,
+        "comment": "AI agents and contributors should respect these file-size limits. Files at or above hardSplit must be split before checkpoint. Files above warningThreshold require a justification comment at the top."
+      },
+      "modularity": {
+        "preferModularFiles": true,
+        "extractAtFunctionGroupSize": 3,
+        "maxImportsPerModule": 8,
+        "comment": "Prefer many small single-purpose files over large multi-purpose files. Extract a group of 3+ related functions into a dedicated module. Consider splitting a module when importing more than 8 symbols from it."
+      },
+      "functionRules": {
+        "maxLines": 40,
+        "preferPure": true,
+        "noAnyInExportedSignatures": true,
+        "comment": "Keep functions small and focused. Prefer pure functions. Avoid 'any' in exported TypeScript signatures."
+      }
     }
   },
   "activation": {

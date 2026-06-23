@@ -1,5 +1,7 @@
 # TCTBP-Web Template – Copilot Instructions
 
+> **TEMPLATE REPOSITORY ONLY.** These instructions apply to the TCTBP-Web template repo itself — not to projects scaffolded from it. Scaffolded projects receive a different set of instructions (see `templates/copilot-instructions.md.template`) focused on application development with file-size limits, modularity rules, and framework-specific conventions.
+
 ## Purpose
 
 This repository is the canonical source for the TCTBP-Web workflow templates, deterministic Node.js runners, and project scaffold factory.

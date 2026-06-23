@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+const fs = require("fs");
+const path = require("path");
 const {
   detectGitOperationState,
   fail,
@@ -18,6 +20,7 @@ const {
   loadPolicy,
   printSummaryTable,
   readVersionSource,
+  repoRoot,
   resolveStatusRecommendations,
   summariseWorkingTree
 } = require("./tctbp-core");
@@ -86,6 +89,18 @@ function main(config, cliOptions) {
   const localTag = getReachableReleaseTag(config);
   const remoteTag = localTag && gitRemoteTagExists(localTag) ? localTag : null;
   const versionSource = readVersionSource(config);
+
+  // Detect handover continuation files
+  let handoverContinuationCount = 0;
+  try {
+    const contDir = path.join(repoRoot, ".tctbp", "continuation");
+    if (fs.existsSync(contDir)) {
+      handoverContinuationCount = fs.readdirSync(contDir).filter((name) => name.endsWith(".md")).length;
+    }
+  } catch (_) {
+    // Directory not readable — skip.
+  }
+
   const shipReadiness = resolveShipReadiness({
     currentBranch,
     currentRemoteExists,
@@ -167,9 +182,9 @@ function main(config, cliOptions) {
     },
     {
       origin: "n/a",
-      local: operationStates.length > 0 ? operationStates.join(", ") : "none recorded",
+      local: operationStates.length > 0 ? operationStates.join(", ") : handoverContinuationCount > 0 ? `${handoverContinuationCount} continuation file(s)` : "none recorded",
       status: "Handover metadata / partial state",
-      actions: operationStates.length > 0 ? "Use abort before any other mutating workflow." : "Repo does not keep separate handover metadata."
+      actions: operationStates.length > 0 ? "Use abort before any other mutating workflow." : handoverContinuationCount > 0 ? "Run resume or say orient to load the continuation context." : "Repo does not keep separate handover metadata."
     },
     {
       origin: defaultRemoteExists ? defaultOriginSha || "n/a" : "n/a",

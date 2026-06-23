@@ -13,6 +13,10 @@ const GITHUB_DIR = path.join(SCAFFOLD_REPO_ROOT, ".github");
 const RUNNER_FILES = [
   "tctbp-runtime.js",
   "tctbp-core.js",
+  "tctbp-git-ops.js",
+  "tctbp-profile-io.js",
+  "tctbp-output.js",
+  "tctbp-gates.js",
   "tctbp-pretool-hook.js",
   "tctbp-run-status.js",
   "tctbp-run-checkpoint.js",
@@ -30,6 +34,8 @@ const RUNNER_FILES = [
   "tctbp-run-runtime-advisory.js",
   "tctbp-run-workflow.js",
   "tctbp-status-report.js",
+  "tctbp-scaffold-cli.js",
+  "tctbp-scaffold-profile.js",
 ];
 
 const GITHUB_FILES = [

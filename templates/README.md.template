@@ -1,0 +1,46 @@
+# {{PROJECT_NAME}}
+
+{{PROJECT_DESCRIPTION}}
+
+## Quick Start
+
+1. Install Node.js 18+.
+2. Run `npm install` from the repo root.
+3. {{QUICK_START_STEPS}}
+
+## TCTBP-Web Runtime
+
+This project was scaffolded with the TCTBP-Web workflow. All TCTBP triggers are available:
+
+```
+status please
+checkpoint please
+publish please
+handover please
+ship please
+promote staging please
+deploy dev please
+run tests
+```
+
+See `.github/TCTBP Cheatsheet.md` for the full operator reference.
+
+## Branch Model
+
+This project uses the {{BRANCH_STRATEGY_DESCRIPTION}}:
+
+{{BRANCH_DIAGRAM}}
+
+## Scripts
+
+- `npm run typecheck` — TypeScript validation
+{{SCRIPT_LIST}}
+
+## Project Structure
+
+```
+src/           # Application source
+scripts/       # TCTBP-Web runners (managed, do not edit)
+.github/       # TCTBP-Web workflow configuration
+templates/     # Scaffold templates (reference only)
+```

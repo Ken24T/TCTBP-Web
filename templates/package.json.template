@@ -1,0 +1,14 @@
+{
+  "name": "{{PROJECT_NAME}}",
+  "private": true,
+  "version": "0.1.0",
+  "description": "{{PROJECT_DESCRIPTION}}",
+  "scripts": {
+    {{TEST_SCRIPTS}}
+    "typecheck": "tsc --noEmit"
+  },
+  {{TEST_DEV_DEPENDENCIES}}
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

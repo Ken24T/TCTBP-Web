@@ -165,9 +165,9 @@ async function main(config, cliOptions) {
   }
 }
 
-async function writeContinuationNote(config, cliOptions, branch, commit) {
+async function writeContinuationNote(_config, cliOptions, branch, commit) {
   if (cliOptions.dryRun) {
-    console.log("[dry-run] Would prompt for handover notes and write a detailed continuation file.");
+    console.log("[dry-run] Would write a fully automated continuation file from git context.");
     return false;
   }
 
@@ -175,7 +175,6 @@ async function writeContinuationNote(config, cliOptions, branch, commit) {
     return false;
   }
 
-  const readline = require("readline");
   const fs = require("fs");
   const path = require("path");
   const { spawnSync } = require("child_process");
@@ -183,6 +182,7 @@ async function writeContinuationNote(config, cliOptions, branch, commit) {
   // ── Gather git context ────────────────────────────────────────────────
 
   const sessionStartRef = resolveSessionStartRef();
+
   const gitLog = runGitCaptureSilent(
     ["log", "--oneline", "--decorate", `${sessionStartRef}..HEAD`],
     repoRoot
@@ -196,89 +196,16 @@ async function writeContinuationNote(config, cliOptions, branch, commit) {
     ["diff", "--stat", `${sessionStartRef}..HEAD`],
     repoRoot
   );
-  const fileNames = runGitCaptureSilent(
-    ["diff", "--name-only", `${sessionStartRef}..HEAD`],
-    repoRoot
-  );
-  const fileList = fileNames
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
 
   const untrackedFiles = runGitCaptureSilent(
     ["ls-files", "--others", "--exclude-standard"],
     repoRoot
   );
 
-  // ── Multi-line prompt helper ──────────────────────────────────────────
-
-  const askMultiline = (rl, prompt) => new Promise((resolve) => {
-    const lines = [];
-    console.log(`\n${prompt}`);
-    console.log("(Type your response. Press Enter on an empty line to finish.)");
-    rl.setPrompt("> ");
-    rl.prompt();
-    rl.on("line", (line) => {
-      if (line.trim() === "" && lines.length > 0) {
-        rl.removeAllListeners("line");
-        resolve(lines.join("\n"));
-      } else if (line.trim() !== "") {
-        lines.push(line);
-        rl.prompt();
-      } else {
-        rl.prompt();
-      }
-    });
-  });
-
-  // ── Interview ─────────────────────────────────────────────────────────
-
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
-
-  // Show git context before interview
-  if (commitList.length > 0) {
-    console.log(`\nSession activity (${commitList.length} commit(s) since ${sessionStartRef}):`);
-    for (const c of commitList.slice(0, 20)) {
-      console.log(`  ${c}`);
-    }
-    if (commitList.length > 20) {
-      console.log(`  ... and ${commitList.length - 20} more`);
-    }
-  }
-
-  if (fileList.length > 0) {
-    console.log(`\nFiles touched this session (${fileList.length}):`);
-    for (const f of fileList.slice(0, 30)) {
-      console.log(`  ${f}`);
-    }
-    if (fileList.length > 30) {
-      console.log(`  ... and ${fileList.length - 30} more`);
-    }
-  }
-
-  console.log("\n--- Handover Continuation ---");
-  console.log("This creates a detailed context file so you (or an AI) can pick up where you left off.");
-  console.log("Be generous — narrative, decisions, gotchas. The more detail, the better the resume.\n");
-
-  // Q1: Session summary (multi-line)
-  const summary = await askMultiline(rl, "▸ Session Summary — What did you accomplish? Key decisions made? Why?");
-  rl.close();
-
-  // Q2: Plan progress
-  const rl2 = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const planProgress = await askMultiline(rl2, "▸ Plan Progress — What got done? What's still open? (Checklist format)");
-  rl2.close();
-
-  // Q3: Mistakes & gotchas
-  const rl3 = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const gotchas = await askMultiline(rl3, "▸ Mistakes & Gotchas — What broke? What should the next person avoid?");
-  rl3.close();
-
-  // Q4: Next session
-  const rl4 = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const nextSession = await askMultiline(rl4, "▸ Next Session — What's the very next thing to work on, specifically?");
-  rl4.close();
+  const workingTree = runGitCaptureSilent(
+    ["status", "--porcelain"],
+    repoRoot
+  );
 
   // ── Assemble document ─────────────────────────────────────────────────
 
@@ -290,8 +217,8 @@ async function writeContinuationNote(config, cliOptions, branch, commit) {
   const fileName = `${timestamp}-handover.md`;
   const filePath = path.join(continuationDir, fileName);
 
-  // Build files-touched table from diff --stat
-  let filesTable = "";
+  // Files touched table
+  let filesTable = "_No files changed this session._";
   const diffLines = fileDiff.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
   if (diffLines.length > 0) {
     filesTable = "| File | Change |\n|------|--------|\n";
@@ -303,8 +230,8 @@ async function writeContinuationNote(config, cliOptions, branch, commit) {
     }
   }
 
-  // Build checkpoint log from commit list
-  let checkpoints = "";
+  // Checkpoint log table
+  let checkpoints = "_No commits this session._";
   if (commitList.length > 0) {
     checkpoints = "| Commit | Message |\n|--------|--------|\n";
     for (const c of commitList) {
@@ -315,38 +242,34 @@ async function writeContinuationNote(config, cliOptions, branch, commit) {
     }
   }
 
+  // Working tree summary
+  const treeStatus = workingTree.trim()
+    ? `\`\`\`\n${workingTree}\n\`\`\``
+    : "clean";
+
   const content = [
     `# Handover Continuation — ${dateStr.slice(0, 10)}`,
     "",
+    `*Auto-generated by TCTBP handover on ${dateStr}*`,
+    "",
     "## Session Summary",
     "",
-    summary.trim() || "_No summary provided._",
-    "",
-    "## Plan Progress",
-    "",
-    planProgress.trim() || "_No plan progress recorded._",
-    "",
-    gotchas.trim() ? "## Mistakes & Gotchas" : "",
-    gotchas.trim() || "",
+    `${commitList.length} commit(s) across ${diffLines.length} file(s) since ${sessionStartRef}.`,
     "",
     "## Files Touched",
     "",
-    filesTable || "_No files changed this session._",
+    filesTable,
     "",
     "## Checkpoint Log",
     "",
-    checkpoints || "_No commits this session._",
+    checkpoints,
     "",
     "## Branch & Commit Context",
     "",
     `- **Branch:** ${branch}`,
     `- **Last commit:** ${commit}`,
-    `- **Working tree:** ${untrackedFiles.trim() ? "has untracked files" : "clean"}`,
+    `- **Working tree:** ${treeStatus}`,
     `- **Session range:** ${sessionStartRef}..HEAD`,
-    "",
-    "## Next Session",
-    "",
-    nextSession.trim() || "_No next steps recorded._",
     "",
     "---",
     "",
@@ -357,7 +280,7 @@ async function writeContinuationNote(config, cliOptions, branch, commit) {
   fs.writeFileSync(filePath, content, "utf8");
 
   console.log(`\nContinuation file: .tctbp/continuation/${fileName}`);
-  console.log(`Sections: summary, plan progress, ${gotchas.trim() ? "mistakes & gotchas, " : ""}files touched, checkpoint log, next session`);
+  console.log(`Auto-generated from git: ${commitList.length} commits, ${diffLines.length} files`);
 
   // Stage, commit, and push
   spawnSync("git", ["add", ".tctbp/continuation/"], { cwd: repoRoot, stdio: "inherit" });

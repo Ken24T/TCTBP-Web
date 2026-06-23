@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const {
+  createTimestamp,
   detectGitOperationState,
   fail,
   fetchOrigin,
@@ -16,6 +17,7 @@ const {
   logSection,
   printSummaryTable,
   runCommand,
+  runMutableGit,
   runShellCommand,
   summariseWorkingTree
 } = require("./tctbp-core");
@@ -26,9 +28,11 @@ if (options.list) {
   printUsage(0);
 }
 
-main(loadPolicy(), options);
+main(loadPolicy(), options).catch((error) => {
+  fail(error instanceof Error ? error.message : String(error));
+});
 
-function main(config, cliOptions) {
+async function main(config, cliOptions) {
   const branch = getCurrentBranch();
 
   if (branch === "HEAD") {
@@ -100,6 +104,10 @@ function main(config, cliOptions) {
     fail("Handover stopped because branch sync could not be verified after publication.");
   }
 
+  // ── Continuation note ─────────────────────────────────────────────────
+
+  const continuationWritten = await writeContinuationNote(config, cliOptions, branch, finalHead);
+
   printSummaryTable([
     {
       origin: originBefore || "n/a",
@@ -123,11 +131,74 @@ function main(config, cliOptions) {
       origin: "n/a",
       local: finalWorkingTree.summary,
       status: "Final baseline",
-      actions: finalWorkingTree.isClean ? "Ready to resume on another machine." : "Resolve local changes before relying on handover baseline."
+      actions: finalWorkingTree.isClean
+        ? (continuationWritten ? "Ready to resume on another machine. Continuation note saved." : "Ready to resume on another machine.")
+        : "Resolve local changes before relying on handover baseline."
     }
   ]);
 
   console.log(`Handover ${cliOptions.dryRun ? "plan" : "workflow"} complete for ${branch} at ${finalHead}.`);
+  if (continuationWritten) {
+    console.log(`Continuation note saved. Use "resume" or "orient" when you return to this repo.`);
+  }
+}
+
+async function writeContinuationNote(config, cliOptions, branch, commit) {
+  if (cliOptions.dryRun) {
+    console.log("[dry-run] Would prompt for an optional handover note and write a continuation file.");
+    return false;
+  }
+
+  if (cliOptions.noContinuation) {
+    return false;
+  }
+
+  const readline = require("readline");
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const ask = (question) => new Promise((resolve) => rl.question(question, resolve));
+
+  console.log("");
+  const note = await ask("Handover note — what were you working on? (press Enter to skip): ");
+  rl.close();
+
+  const timestamp = createTimestamp();
+  const fs = require("fs");
+  const path = require("path");
+  const { repoRoot } = require("./tctbp-runtime");
+
+  const continuationDir = path.join(repoRoot, ".tctbp", "continuation");
+  fs.mkdirSync(continuationDir, { recursive: true });
+
+  const fileName = `${timestamp}-handover.md`;
+  const filePath = path.join(continuationDir, fileName);
+
+  const content = [
+    "# Branch & Commit Context",
+    "",
+    `**Date:** ${new Date().toISOString().split("T")[0]}`,
+    `**Branch:** ${branch}`,
+    `**Commit:** ${commit}`,
+    "",
+    note.trim() || "_No note provided._",
+    ""
+  ].join("\n");
+
+  fs.writeFileSync(filePath, content, "utf8");
+  console.log(`Wrote continuation note to .tctbp/continuation/${fileName}`);
+
+  // Stage, commit, and push the continuation file
+  const { spawnSync } = require("child_process");
+  const cwd = require("./tctbp-runtime").resolveRepoRoot();
+
+  spawnSync("git", ["add", ".tctbp/continuation/"], { cwd, stdio: "inherit" });
+  const commitResult = spawnSync("git", ["commit", "-m", "handover: continuation note"], { cwd, stdio: "inherit" });
+
+  if (commitResult.status === 0) {
+    spawnSync("git", ["push", "origin", branch], { cwd, stdio: "inherit" });
+    console.log("Continuation note committed and pushed.");
+  }
+
+  return true;
 }
 
 function runRuntimeAdvisory(config, dryRun) {
@@ -144,7 +215,8 @@ function runRuntimeAdvisory(config, dryRun) {
 function parseArgs(argv) {
   const parsed = {
     dryRun: false,
-    list: false
+    list: false,
+    noContinuation: false
   };
 
   for (const arg of argv) {
@@ -158,6 +230,11 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === "--no-continuation") {
+      parsed.noContinuation = true;
+      continue;
+    }
+
     fail(`Unknown option '${arg}'.`);
   }
 
@@ -165,6 +242,6 @@ function parseArgs(argv) {
 }
 
 function printUsage(exitCode) {
-  console.log("Usage: node scripts/tctbp-run-handover.js [--dry-run] [--list]");
+  console.log("Usage: node scripts/tctbp-run-handover.js [--dry-run] [--no-continuation] [--list]");
   process.exit(exitCode);
 }

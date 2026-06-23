@@ -146,7 +146,7 @@ async function main(config, cliOptions) {
 
 async function writeContinuationNote(config, cliOptions, branch, commit) {
   if (cliOptions.dryRun) {
-    console.log("[dry-run] Would prompt for an optional handover note and write a continuation file.");
+    console.log("[dry-run] Would prompt for handover notes and write a detailed continuation file.");
     return false;
   }
 
@@ -155,17 +155,28 @@ async function writeContinuationNote(config, cliOptions, branch, commit) {
   }
 
   const readline = require("readline");
+  const fs = require("fs");
+  const path = require("path");
+  const { spawnSync } = require("child_process");
+
+  console.log("\n--- Handover Continuation ---");
+  console.log("This creates a context file so you can pick up where you left off.");
+  console.log("Be generous — the more detail, the easier it is to resume.\n");
+
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = (question) => new Promise((resolve) => rl.question(question, resolve));
 
-  console.log("");
-  const note = await ask("Handover note — what were you working on? (press Enter to skip): ");
+  const whatWasDone = await ask("What did you accomplish this session? ");
+  const whatsNext = await ask("What's the next thing to work on? ");
+  const gotchas = await ask("Any mistakes made or things to watch out for? (press Enter to skip): ");
   rl.close();
 
-  const timestamp = createTimestamp();
-  const fs = require("fs");
-  const path = require("path");
+  // Gather git context
+  const recentLog = runGitCaptureSilent(["log", "--oneline", "--decorate", "-n", "15"], repoRoot);
+  const recentFiles = runGitCaptureSilent(["diff", "--stat", "HEAD~5..HEAD"], repoRoot);
+  const currentFiles = runGitCaptureSilent(["ls-files", "--others", "--exclude-standard", "--modified"], repoRoot);
 
+  const timestamp = createTimestamp();
   const continuationDir = path.join(repoRoot, ".tctbp", "continuation");
   fs.mkdirSync(continuationDir, { recursive: true });
 
@@ -173,31 +184,75 @@ async function writeContinuationNote(config, cliOptions, branch, commit) {
   const filePath = path.join(continuationDir, fileName);
 
   const content = [
-    "# Branch & Commit Context",
+    "# Handover Continuation",
     "",
-    `**Date:** ${new Date().toISOString().split("T")[0]}`,
+    "## Session Summary",
+    "",
+    `**Date:** ${new Date().toISOString().replace("T", " ").slice(0, 19)}`,
     `**Branch:** ${branch}`,
     `**Commit:** ${commit}`,
     "",
-    note.trim() || "_No note provided._",
+    "### What was accomplished",
+    "",
+    whatWasDone.trim() || "_No summary provided._",
+    "",
+    "### What to work on next",
+    "",
+    whatsNext.trim() || "_No next steps provided._",
+    "",
+    gotchas.trim() ? "### Gotchas / things to watch out for" : "",
+    gotchas.trim() ? "" : "",
+    gotchas.trim() || "",
+    gotchas.trim() ? "" : "",
+    "## Git Context",
+    "",
+    "### Recent commits",
+    "",
+    "```",
+    recentLog || "_Could not retrieve git log._",
+    "```",
+    "",
+    recentFiles.trim() ? "### Recent file changes" : "",
+    recentFiles.trim() ? "" : "",
+    recentFiles.trim() ? "```" : "",
+    recentFiles.trim() || "",
+    recentFiles.trim() ? "```" : "",
+    "",
+    currentFiles.trim() ? "### Current working state" : "",
+    currentFiles.trim() ? "" : "",
+    currentFiles.trim() ? "```" : "",
+    currentFiles.trim() || "",
+    currentFiles.trim() ? "```" : "",
+    "",
+    "---",
+    "",
+    'Say **"orient"** or **"pick up from handover"** to resume where you left off.',
     ""
   ].join("\n");
 
   fs.writeFileSync(filePath, content, "utf8");
-  console.log(`Wrote continuation note to .tctbp/continuation/${fileName}`);
 
-  // Stage, commit, and push the continuation file
-  const { spawnSync } = require("child_process");
+  // Show a preview
+  console.log(`\nContinuation file: .tctbp/continuation/${fileName}`);
+  console.log(`Lines: ${content.split("\\n").length}`);
 
+  // Stage, commit, and push
   spawnSync("git", ["add", ".tctbp/continuation/"], { cwd: repoRoot, stdio: "inherit" });
   const commitResult = spawnSync("git", ["commit", "-m", "handover: continuation note"], { cwd: repoRoot, stdio: "inherit" });
 
   if (commitResult.status === 0) {
     spawnSync("git", ["push", "origin", branch], { cwd: repoRoot, stdio: "inherit" });
-    console.log("Continuation note committed and pushed.");
+    console.log("Committed and pushed.");
   }
 
   return true;
+}
+
+function runGitCaptureSilent(args, cwd) {
+  const { spawnSync } = require("child_process");
+  const result = spawnSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  if (result.error || result.status !== 0) return "";
+  return (result.stdout || "").trim();
 }
 
 function runRuntimeAdvisory(config, dryRun) {

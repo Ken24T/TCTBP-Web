@@ -12,7 +12,7 @@
     "description": "Canonical template repository for web/browser-based projects using the TCTBP workflow with deterministic Node.js runners, staged branch model, code-loss prevention, and a project scaffold factory.",
     "defaultBranch": "main",
     "packageManager": "npm",
-    "versionFiles": ["VERSION"],
+    "versionFiles": ["VERSION", "package.json"],
     "changelogFormat": "keep-a-changelog",
     "locale": "en-US"
   },

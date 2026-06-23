@@ -1,0 +1,9 @@
+{
+  "name": "tctbp-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical template repository for web/browser-based projects using the TCTBP workflow",
+  "scripts": {
+    "test": "node -e \"console.log('TCTBP-Web template repo: no project-level tests.')\""
+  }
+}

@@ -47,29 +47,40 @@ async function main(config, cliOptions) {
 
   logSection("Handover");
   logItem("Branch", branch);
-  logItem("Mode", cliOptions.dryRun ? "dry-run" : "live");
+  logItem("Mode", cliOptions.localOnly ? "local-only" : cliOptions.dryRun ? "dry-run" : "live");
 
-  runRuntimeAdvisory(config, cliOptions.dryRun);
+  if (!cliOptions.localOnly) {
+    runRuntimeAdvisory(config, cliOptions.dryRun);
+    fetchOrigin(cliOptions.dryRun, true);
 
-  fetchOrigin(cliOptions.dryRun, true);
+    const remoteExistsBefore = gitRemoteBranchExists(branch);
+    const syncStateBefore = inspectBranchSyncState(branch, {
+      remoteExists: remoteExistsBefore,
+      localRef: "HEAD"
+    });
 
-  const remoteExistsBefore = gitRemoteBranchExists(branch);
-  const syncStateBefore = inspectBranchSyncState(branch, {
-    remoteExists: remoteExistsBefore,
-    localRef: "HEAD"
-  });
+    if (syncStateBefore.diverged) {
+      fail(`Handover stopped because ${branch} has diverged from origin/${branch}.`);
+    }
 
-  if (syncStateBefore.diverged) {
-    fail(`Handover stopped because ${branch} has diverged from origin/${branch}.`);
+    if (syncStateBefore.behind > 0) {
+      fail(`Handover stopped because ${branch} is behind origin/${branch} by ${syncStateBefore.behind} commit(s).`);
+    }
   }
 
-  if (syncStateBefore.behind > 0) {
-    fail(`Handover stopped because ${branch} is behind origin/${branch} by ${syncStateBefore.behind} commit(s).`);
+  let originBefore = null;
+  let remoteExistsBefore = false;
+  let remoteExistsAfter = false;
+  let syncStateAfter = null;
+  let originAfter = null;
+
+  if (!cliOptions.localOnly) {
+    remoteExistsBefore = gitRemoteBranchExists(branch);
+    originBefore = remoteExistsBefore ? getShortRef(`refs/remotes/origin/${branch}`) : null;
   }
 
   const preHead = getHeadCommit(true);
   const preWorkingTree = summariseWorkingTree(getWorkingTreeStatus());
-  const originBefore = remoteExistsBefore ? getShortRef(`refs/remotes/origin/${branch}`) : null;
 
   let checkpointCreated = false;
   if (!preWorkingTree.isClean) {
@@ -86,24 +97,29 @@ async function main(config, cliOptions) {
 
   const postCheckpointHead = getHeadCommit(true);
 
-  runCommand(
-    "node",
-    ["scripts/tctbp-run-publish.js", ...(cliOptions.dryRun ? ["--dry-run"] : [])],
-    cliOptions.dryRun,
-    "Run publish step during handover"
-  );
+  if (!cliOptions.localOnly) {
+    runCommand(
+      "node",
+      ["scripts/tctbp-run-publish.js", ...(cliOptions.dryRun ? ["--dry-run"] : [])],
+      cliOptions.dryRun,
+      "Run publish step during handover"
+    );
 
-  const remoteExistsAfter = cliOptions.dryRun ? remoteExistsBefore : gitRemoteBranchExists(branch);
-  const syncStateAfter = cliOptions.dryRun
-    ? syncStateBefore
-    : inspectBranchSyncState(branch, { remoteExists: remoteExistsAfter, localRef: "HEAD" });
-  const originAfter = remoteExistsAfter ? getShortRef(`refs/remotes/origin/${branch}`) : null;
+    remoteExistsAfter = cliOptions.dryRun ? remoteExistsBefore : gitRemoteBranchExists(branch);
+    syncStateAfter = cliOptions.dryRun
+      ? inspectBranchSyncState(branch, { remoteExists: remoteExistsBefore, localRef: "HEAD" })
+      : inspectBranchSyncState(branch, { remoteExists: remoteExistsAfter, localRef: "HEAD" });
+    originAfter = remoteExistsAfter ? getShortRef(`refs/remotes/origin/${branch}`) : null;
+
+    if (!cliOptions.dryRun && (!remoteExistsAfter || syncStateAfter.ahead > 0 || syncStateAfter.behind > 0 || syncStateAfter.diverged)) {
+      fail("Handover stopped because branch sync could not be verified after publication.");
+    }
+  } else {
+    console.log("Local-only mode: skipping publish step.");
+  }
+
   const finalHead = getHeadCommit(true);
   const finalWorkingTree = summariseWorkingTree(getWorkingTreeStatus());
-
-  if (!cliOptions.dryRun && (!remoteExistsAfter || syncStateAfter.ahead > 0 || syncStateAfter.behind > 0 || syncStateAfter.diverged)) {
-    fail("Handover stopped because branch sync could not be verified after publication.");
-  }
 
   // ── Continuation note ─────────────────────────────────────────────────
 
@@ -120,20 +136,25 @@ async function main(config, cliOptions) {
       origin: "n/a",
       local: checkpointCreated ? `${preHead} -> ${postCheckpointHead}` : "no checkpoint needed",
       status: "Checkpoint step",
-      actions: checkpointCreated ? "Local checkpoint created before publication." : "Skipped because working tree was already clean."
+      actions: checkpointCreated ? "Local checkpoint created." : "Skipped because working tree was already clean."
     },
-    {
+    ...(cliOptions.localOnly ? [{
+      origin: "n/a",
+      local: `${branch} @ ${finalHead}`,
+      status: "Publish step",
+      actions: "Skipped — local-only mode. No remote interaction."
+    }] : [{
       origin: `${originBefore || "n/a"} -> ${originAfter || "n/a"}`,
       local: `${branch} @ ${finalHead}`,
-      status: `Upstream sync: ${formatSyncStatus(syncStateAfter, remoteExistsAfter)}`,
+      status: `Upstream sync: ${syncStateAfter ? formatSyncStatus(syncStateAfter, remoteExistsAfter) : "n/a"}`,
       actions: cliOptions.dryRun ? "Dry run only; no remote update occurred." : "Branch publication and sync verification completed."
-    },
+    }]),
     {
       origin: "n/a",
       local: finalWorkingTree.summary,
       status: "Final baseline",
       actions: finalWorkingTree.isClean
-        ? (continuationWritten ? "Ready to resume on another machine. Continuation note saved." : "Ready to resume on another machine.")
+        ? (continuationWritten ? "Ready to resume. Continuation note saved." : "Ready to resume.")
         : "Resolve local changes before relying on handover baseline."
     }
   ]);
@@ -270,6 +291,7 @@ function parseArgs(argv) {
   const parsed = {
     dryRun: false,
     list: false,
+    localOnly: false,
     noContinuation: false
   };
 
@@ -281,6 +303,11 @@ function parseArgs(argv) {
 
     if (arg === "--list") {
       parsed.list = true;
+      continue;
+    }
+
+    if (arg === "--local-only") {
+      parsed.localOnly = true;
       continue;
     }
 
@@ -296,6 +323,6 @@ function parseArgs(argv) {
 }
 
 function printUsage(exitCode) {
-  console.log("Usage: node scripts/tctbp-run-handover.js [--dry-run] [--no-continuation] [--list]");
+  console.log("Usage: node scripts/tctbp-run-handover.js [--dry-run] [--local-only] [--no-continuation] [--list]");
   process.exit(exitCode);
 }

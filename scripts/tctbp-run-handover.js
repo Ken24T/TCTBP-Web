@@ -297,17 +297,27 @@ async function writeContinuationNote(_config, cliOptions, branch, commit) {
     }
   }
 
-  // Key changes summary
+  // Build summary section — use copilot note if provided, else auto-generated
   const netDelta = totalAdded - totalRemoved;
   const deltaLabel = netDelta >= 0 ? `+${netDelta}` : `${netDelta}`;
-
   const netDeltaLine = netDelta !== 0
     ? `Net change: ${deltaLabel} lines (+${totalAdded} added, −${totalRemoved} removed).`
     : "No net line change.";
-
   const meaningfulLine = meaningfulCommits.length > 0
     ? `${meaningfulCommits.length} meaningful commit(s) — checkpoint commits excluded.`
     : "";
+
+  const copilotNote = cliOptions.note || "";
+  const summarySection = copilotNote.trim()
+    ? copilotNote.trim()
+    : [
+        `${commitList.length} commit(s) across ${diffLines.length} file(s) since ${sessionStartRef}.`,
+        `${newFiles.length} new file(s), ${modifiedFiles.length} modified. ${netDeltaLine}`,
+        meaningfulLine,
+        "",
+        dirSummary ? "### By Directory" : "",
+        dirSummary || "",
+      ].filter((l) => l.length > 0).join("\n");
 
   const treeStatus = workingTree.trim()
     ? `\`\`\`\n${workingTree}\n\`\`\``
@@ -320,13 +330,7 @@ async function writeContinuationNote(_config, cliOptions, branch, commit) {
     "",
     "## Session Summary",
     "",
-    `${commitList.length} commit(s) across ${diffLines.length} file(s) since ${sessionStartRef}.`,
-    `${newFiles.length} new file(s), ${modifiedFiles.length} modified. ${netDeltaLine}`,
-    meaningfulLine,
-    "",
-    dirSummary ? "### By Directory" : "",
-    dirSummary || "",
-    "",
+    summarySection,
     "## Files Touched",
     "",
     filesTable,
@@ -407,7 +411,8 @@ function parseArgs(argv) {
     dryRun: false,
     list: false,
     localOnly: false,
-    noContinuation: false
+    noContinuation: false,
+    note: null
   };
 
   for (const arg of argv) {
@@ -431,6 +436,13 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === "--note") {
+      // --note consumes all remaining args as the note text
+      const remaining = argv.slice(argv.indexOf(arg) + 1);
+      parsed.note = remaining.join(" ");
+      break;
+    }
+
     fail(`Unknown option '${arg}'.`);
   }
 
@@ -438,6 +450,6 @@ function parseArgs(argv) {
 }
 
 function printUsage(exitCode) {
-  console.log("Usage: node scripts/tctbp-run-handover.js [--dry-run] [--local-only] [--no-continuation] [--list]");
+  console.log("Usage: node scripts/tctbp-run-handover.js [--dry-run] [--local-only] [--no-continuation] [--note \"<markdown>\"] [--list]");
   process.exit(exitCode);
 }

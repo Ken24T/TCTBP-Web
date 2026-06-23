@@ -207,6 +207,53 @@ async function writeContinuationNote(_config, cliOptions, branch, commit) {
     repoRoot
   );
 
+  // ── Analyze changes ──────────────────────────────────────────────────
+
+  // Count new vs modified files
+  const newFiles = [];
+  const modifiedFiles = [];
+  const diffLines = fileDiff.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+
+  for (const line of diffLines) {
+    const parts = line.split("|");
+    if (parts.length < 2) continue;
+    const filePath = parts[0].trim();
+    const stat = parts[1].trim();
+    // git diff --stat: new files show only additions, modified show both
+    if (stat.includes("+") && !stat.includes("-")) {
+      newFiles.push({ path: filePath, stat });
+    } else {
+      modifiedFiles.push({ path: filePath, stat });
+    }
+  }
+
+  // Net line delta
+  let totalAdded = 0;
+  let totalRemoved = 0;
+  for (const line of diffLines) {
+    const parts = line.split("|");
+    if (parts.length < 2) continue;
+    const stat = parts[1].trim();
+    const addMatch = stat.match(/(\d+)\s*\+/);
+    const delMatch = stat.match(/(\d+)\s*\-/);
+    if (addMatch) totalAdded += parseInt(addMatch[1], 10);
+    if (delMatch) totalRemoved += parseInt(delMatch[1], 10);
+  }
+
+  // Extract meaningful commit messages (non-checkpoint, non-handover)
+  const meaningfulCommits = commitList.filter((c) => {
+    const msg = c.slice(c.indexOf(" ") + 1).toLowerCase();
+    return !msg.startsWith("checkpoint:") && !msg.startsWith("handover:");
+  });
+
+  // Categorize files by directory
+  const byDir = {};
+  for (const f of [...newFiles, ...modifiedFiles]) {
+    const dir = f.path.includes("/") ? f.path.split("/")[0] : "(root)";
+    if (!byDir[dir]) byDir[dir] = [];
+    byDir[dir].push(f.path);
+  }
+
   // ── Assemble document ─────────────────────────────────────────────────
 
   const timestamp = createTimestamp();
@@ -219,7 +266,6 @@ async function writeContinuationNote(_config, cliOptions, branch, commit) {
 
   // Files touched table
   let filesTable = "_No files changed this session._";
-  const diffLines = fileDiff.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
   if (diffLines.length > 0) {
     filesTable = "| File | Change |\n|------|--------|\n";
     for (const line of diffLines) {
@@ -230,7 +276,7 @@ async function writeContinuationNote(_config, cliOptions, branch, commit) {
     }
   }
 
-  // Checkpoint log table
+  // Checkpoint log (compact)
   let checkpoints = "_No commits this session._";
   if (commitList.length > 0) {
     checkpoints = "| Commit | Message |\n|--------|--------|\n";
@@ -242,7 +288,27 @@ async function writeContinuationNote(_config, cliOptions, branch, commit) {
     }
   }
 
-  // Working tree summary
+  // Directory breakdown
+  let dirSummary = "";
+  if (Object.keys(byDir).length > 0) {
+    dirSummary = "| Directory | Files |\n|-----------|------|\n";
+    for (const [dir, files] of Object.entries(byDir).sort()) {
+      dirSummary += `| \`${dir}/\` | ${files.length} |\n`;
+    }
+  }
+
+  // Key changes summary
+  const netDelta = totalAdded - totalRemoved;
+  const deltaLabel = netDelta >= 0 ? `+${netDelta}` : `${netDelta}`;
+
+  const netDeltaLine = netDelta !== 0
+    ? `Net change: ${deltaLabel} lines (+${totalAdded} added, −${totalRemoved} removed).`
+    : "No net line change.";
+
+  const meaningfulLine = meaningfulCommits.length > 0
+    ? `${meaningfulCommits.length} meaningful commit(s) — checkpoint commits excluded.`
+    : "";
+
   const treeStatus = workingTree.trim()
     ? `\`\`\`\n${workingTree}\n\`\`\``
     : "clean";
@@ -255,6 +321,11 @@ async function writeContinuationNote(_config, cliOptions, branch, commit) {
     "## Session Summary",
     "",
     `${commitList.length} commit(s) across ${diffLines.length} file(s) since ${sessionStartRef}.`,
+    `${newFiles.length} new file(s), ${modifiedFiles.length} modified. ${netDeltaLine}`,
+    meaningfulLine,
+    "",
+    dirSummary ? "### By Directory" : "",
+    dirSummary || "",
     "",
     "## Files Touched",
     "",

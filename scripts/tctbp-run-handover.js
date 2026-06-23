@@ -16,6 +16,7 @@ const {
   logItem,
   logSection,
   printSummaryTable,
+  repoRoot,
   runCommand,
   runMutableGit,
   runShellCommand,
@@ -164,7 +165,6 @@ async function writeContinuationNote(config, cliOptions, branch, commit) {
   const timestamp = createTimestamp();
   const fs = require("fs");
   const path = require("path");
-  const { repoRoot } = require("./tctbp-runtime");
 
   const continuationDir = path.join(repoRoot, ".tctbp", "continuation");
   fs.mkdirSync(continuationDir, { recursive: true });
@@ -188,13 +188,12 @@ async function writeContinuationNote(config, cliOptions, branch, commit) {
 
   // Stage, commit, and push the continuation file
   const { spawnSync } = require("child_process");
-  const cwd = require("./tctbp-runtime").resolveRepoRoot();
 
-  spawnSync("git", ["add", ".tctbp/continuation/"], { cwd, stdio: "inherit" });
-  const commitResult = spawnSync("git", ["commit", "-m", "handover: continuation note"], { cwd, stdio: "inherit" });
+  spawnSync("git", ["add", ".tctbp/continuation/"], { cwd: repoRoot, stdio: "inherit" });
+  const commitResult = spawnSync("git", ["commit", "-m", "handover: continuation note"], { cwd: repoRoot, stdio: "inherit" });
 
   if (commitResult.status === 0) {
-    spawnSync("git", ["push", "origin", branch], { cwd, stdio: "inherit" });
+    spawnSync("git", ["push", "origin", branch], { cwd: repoRoot, stdio: "inherit" });
     console.log("Continuation note committed and pushed.");
   }
 

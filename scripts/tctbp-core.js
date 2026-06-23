@@ -458,11 +458,32 @@ function readVersionSource(config) {
   }
 
   const absolutePath = resolveRepoPath(relativePath);
+
+  // Try JSON first (package.json, etc.)
   const json = maybeReadJsonFile(absolutePath);
+  if (json && typeof json.version === "string") {
+    return {
+      path: relativePath,
+      version: json.version
+    };
+  }
+
+  // Fall back to plain-text version file (VERSION, etc.)
+  try {
+    const text = require("fs").readFileSync(absolutePath, "utf8").trim();
+    if (text.length > 0 && text.length < 64) {
+      return {
+        path: relativePath,
+        version: text.split(/\r?\n/)[0].trim()
+      };
+    }
+  } catch (_error) {
+    // File doesn't exist or can't be read; fall through.
+  }
 
   return {
     path: relativePath,
-    version: json && typeof json.version === "string" ? json.version : "unknown"
+    version: "unknown"
   };
 }
 

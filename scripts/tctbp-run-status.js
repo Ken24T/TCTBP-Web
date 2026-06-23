@@ -58,7 +58,13 @@ function main(config, cliOptions) {
 
   const currentBranch = getCurrentBranch();
   const defaultBranch = (config.branchModel && config.branchModel.productionBranch) || (config.project && config.project.defaultBranch) || "main";
-  const significantBranches = Array.from(new Set(["development", "review", defaultBranch]));
+  const branchModel = config.branchModel || {};
+  const workingBranch = branchModel.workingBranch || "development";
+  const stagingBranch = branchModel.stagingBranch || "staging";
+  const isStaged = branchModel.strategy === "staged";
+  const significantBranches = isStaged
+    ? Array.from(new Set([workingBranch, stagingBranch, defaultBranch]))
+    : Array.from(new Set([defaultBranch]));
   const workingTreeSummary = summariseWorkingTree(getWorkingTreeStatus());
   const operationStates = detectGitOperationState();
   const branchStates = significantBranches.map((branchName) => getBranchState(branchName, currentBranch));
@@ -282,12 +288,17 @@ function getBranchRecommendations(branchStates, currentBranch) {
     );
   }
 
-  if (currentBranch !== "development" && currentBranch !== "review" && currentBranch !== "main" && currentBranch !== "HEAD") {
-    recommendations.push(`current branch '${currentBranch}': use development/review/main for the primary TCTBP lifecycle workflows.`);
+  const branchSet = new Set(branchStates.map((s) => s.branchName));
+  const isOnConfiguredBranch = branchSet.has(currentBranch);
+
+  if (!isOnConfiguredBranch && currentBranch !== "HEAD") {
+    const branchNames = Array.from(branchSet).join("/");
+    recommendations.push(`current branch '${currentBranch}': use ${branchNames} for the primary TCTBP lifecycle workflows.`);
   }
 
   if (currentBranch === "HEAD") {
-    recommendations.push("detached HEAD: reattach to development/review/main before mutating workflows.");
+    const branchNames = Array.from(branchSet).join("/");
+    recommendations.push(`detached HEAD: reattach to ${branchNames} before mutating workflows.`);
   }
 
   return recommendations;

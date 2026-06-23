@@ -5,6 +5,35 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 const { captureBranchSnapshots, printPostTriggerStatusReport } = require("./tctbp-status-report");
 const { resolvePolicyPath, resolveRepoRoot } = require("./tctbp-runtime");
+const {
+  createTimestamp,
+  fail,
+  getCurrentBranch,
+  getHeadCommit,
+  getReleaseTagPattern,
+  getTagsPointingAtHead,
+  getWorkingTreeStatus,
+  gitLocalBranchExists,
+  gitRemoteBranchExists,
+  gitRemoteTagExists,
+  gitRefExists,
+  inspectBranchSyncState,
+  loadPolicy,
+  logItem,
+  logSection,
+  printDirtySummary,
+  printSummaryTable,
+  readVersionSource,
+  resolveRepoPath,
+  resolveTarget,
+  runBuildGate,
+  runGitCapture,
+  runShellCommand,
+  runVerificationGates,
+  stepSemVer,
+  stopIfBehindOrDiverged,
+  summariseWorkingTree,
+} = require("./tctbp-core");
 
 const repoRoot = resolveRepoRoot();
 const policyPath = resolvePolicyPath(repoRoot);
@@ -70,11 +99,11 @@ function main(config, targetInfo, cliOptions) {
   let remoteExists = gitRefExists(remoteRef);
   let remoteState = inspectRemoteState(expectedBranch, remoteExists);
 
-  stopIfBehindOrDiverged(remoteState, remoteBranchLabel);
+  stopIfBehindOrDiverged(remoteState, remoteBranchLabel, "Deploy");
   stopIfUnpublishedOrAhead(target, key, remoteExists, remoteState, remoteBranchLabel);
 
   if (key === "production") {
-    const shippedTags = getReleaseTagsPointingAtHead(config);
+    const shippedTags = getTagsPointingAtHead(config);
 
     if (shippedTags.length === 0) {
       fail("Deploy stopped because main HEAD is not tagged with a shipped release tag.");
@@ -136,7 +165,7 @@ function main(config, targetInfo, cliOptions) {
 
   remoteExists = gitRefExists(remoteRef);
   remoteState = inspectRemoteState(expectedBranch, remoteExists);
-  stopIfBehindOrDiverged(remoteState, remoteBranchLabel);
+  stopIfBehindOrDiverged(remoteState, remoteBranchLabel, "Deploy");
   stopIfUnpublishedOrAhead(target, key, remoteExists, remoteState, remoteBranchLabel);
 
   if (!remoteExists) {
@@ -166,12 +195,6 @@ function main(config, targetInfo, cliOptions) {
     console.log(`- ${item}`);
   }
 
-  runVersionStatusCheck({
-    dryRun: cliOptions.dryRun,
-    strict: true,
-    workflowLabel: `deploy ${key}`,
-  });
-
   printPostTriggerStatusReport({
     repoRoot,
     title: cliOptions.dryRun ? "Post-deploy dry-run status report" : "Post-deploy status report",
@@ -191,92 +214,6 @@ function main(config, targetInfo, cliOptions) {
     ],
     nextSteps: getDeployNextSteps(expectedBranch)
   });
-}
-
-function loadPolicy() {
-  try {
-    return JSON.parse(fs.readFileSync(policyPath, "utf8"));
-  } catch (error) {
-    fail(`Could not read ${policyPath}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
-
-function resolveTarget(targets, targetArg) {
-  const normalized = String(targetArg).toLowerCase();
-
-  for (const [key, target] of Object.entries(targets)) {
-    const names = [key, ...(target.aliases || [])].map((value) => String(value).toLowerCase());
-
-    if (names.includes(normalized)) {
-      return { key, target };
-    }
-  }
-
-  return null;
-}
-
-function runVerificationGates(config, dryRun) {
-  const commands = config.profile && config.profile.commands ? config.profile.commands : {};
-  const configuredBlockingCommands =
-    config.profile && config.profile.verification && Array.isArray(config.profile.verification.blockingCommands)
-      ? config.profile.verification.blockingCommands
-      : ["format", "test", "lint"];
-  const labelMap = {
-    format: "Format",
-    test: "Test",
-    lint: "Lint",
-    build: "Build",
-    "release-build": "Release build"
-  };
-  const verificationCommands = configuredBlockingCommands
-    .map((gateName) => [labelMap[gateName] || gateName, commands[gateName]])
-    .filter(([, command]) => typeof command === "string" && command.trim().length > 0);
-
-  if (verificationCommands.length === 0) {
-    fail("No verification commands are configured in .github/TCTBP.json.");
-  }
-
-  for (const [label, command] of verificationCommands) {
-    runShellCommand(command, dryRun, `${label} gate`);
-  }
-}
-
-function runBuildGate(config, dryRun) {
-  const buildCommand = config.deploy && typeof config.deploy.buildCommand === "string" ? config.deploy.buildCommand : null;
-
-  if (!buildCommand) {
-    fail("No deploy build command is configured in .github/TCTBP.json.");
-  }
-
-  runShellCommand(buildCommand, dryRun, "Runtime build gate");
-}
-
-function runVersionStatusCheck({ dryRun, strict, workflowLabel }) {
-  const scriptPath = path.resolve(repoRoot, "scripts/version-status.mjs");
-  const args = [scriptPath];
-
-  if (strict) {
-    args.push("--strict");
-  }
-
-  if (dryRun) {
-    console.log(`[dry-run] Version safety check after ${workflowLabel}: node ${args.join(" ")}`);
-    return;
-  }
-
-  const result = spawnSync("node", args, {
-    cwd: repoRoot,
-    stdio: "inherit",
-    env: process.env,
-  });
-
-  if (result.error) {
-    fail(`Version safety check failed after ${workflowLabel}: ${result.error.message}`);
-  }
-
-  if (typeof result.status === "number" && result.status !== 0) {
-    fail(`Version safety check failed after ${workflowLabel} with exit code ${result.status}.`);
-  }
 }
 
 function runRuntimePublishStep(config, targetKey, expectedBranch, dryRun) {
@@ -529,19 +466,7 @@ function resolveDeployReleaseVersion(config) {
   }
 }
 
-function getCurrentBranch() {
-  return runGitCapture(["rev-parse", "--abbrev-ref", "HEAD"], "Determine the current branch");
-}
-
-function gitRefExists(refName) {
-  const result = spawnSync("git", ["rev-parse", "--verify", refName], {
-    cwd: repoRoot,
-    stdio: "ignore"
-  });
-
-  return result.status === 0;
-}
-
+// inspectRemoteState kept locally: thin deploy-specific wrapper.
 function inspectRemoteState(branch, remoteExists) {
   if (!remoteExists) {
     return {
@@ -575,20 +500,9 @@ function stopIfUnpublishedOrAhead(target, key, remoteExists, remoteState, remote
   }
 }
 
-function stopIfBehindOrDiverged(remoteState, remoteBranchLabel) {
-  if (remoteState.diverged) {
-    fail(`Deploy stopped because the current branch has diverged from ${remoteBranchLabel}.`);
-  }
+// stopIfBehindOrDiverged removed: imported from core with "Deploy" prefix.
 
-  if (remoteState.behind > 0) {
-    fail(`Deploy stopped because the current branch is behind ${remoteBranchLabel} by ${remoteState.behind} commit(s).`);
-  }
-}
-
-function getWorkingTreeStatus() {
-  return runGitCapture(["status", "--porcelain", "--untracked-files=all"], "Inspect working tree state", true);
-}
-
+// printDirtySyncSummary kept locally: deploy-specific single-param signature.
 function printDirtySyncSummary(statusOutput) {
   const lines = statusOutput
     .split(/\r?\n/)
@@ -666,14 +580,30 @@ function classifyStatusLine(line) {
   return "other";
 }
 
-function getReleaseTagsPointingAtHead(config) {
-  const releaseTagPattern = getReleaseTagPattern(config);
-  const tags = runGitCapture(["tag", "--points-at", "HEAD"], "Inspect release tags at HEAD", true);
+// classifyStatusLine kept locally: core doesn't export it directly.
+// getReleaseTagsPointingAtHead, getReleaseTagPattern, gitRemoteTagExists,
+// createTimestamp, runGitCapture, runShellCommand — imported from core.
+// stopIfBehindOrDiverged — imported from core with "Deploy" prefix.
 
-  return tags
-    .split(/\r?\n/)
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0 && releaseTagPattern.test(value));
+// runMutableGit kept locally: deploy-specific readOnly parameter signature.
+function runMutableGit(args, dryRun, description, readOnly = false) {
+  if (dryRun && !readOnly) {
+    console.log(`[dry-run] ${description}: git ${args.join(" ")}`);
+    return;
+  }
+
+  const result = spawnSync("git", args, {
+    cwd: repoRoot,
+    stdio: "inherit"
+  });
+
+  if (result.error) {
+    fail(`${description} failed: ${result.error.message}`);
+  }
+
+  if (typeof result.status === "number" && result.status !== 0) {
+    fail(`${description} failed with exit code ${result.status}.`);
+  }
 }
 
 function findPublishedReleaseTag(tags) {
@@ -684,38 +614,6 @@ function findPublishedReleaseTag(tags) {
   }
 
   return null;
-}
-
-function getReleaseTagPattern(config) {
-  const configuredFormat =
-    config && config.profile && config.profile.versioning && typeof config.profile.versioning.tagFormat === "string"
-      ? config.profile.versioning.tagFormat
-      : "v{version}";
-  const patternSource = configuredFormat
-    .split("{version}")
-    .map((segment) => escapeRegExp(segment))
-    .join("\\d+\\.\\d+\\.\\d+");
-
-  return new RegExp(`^${patternSource}$`);
-}
-
-function gitRemoteTagExists(tagName) {
-  const result = spawnSync("git", ["ls-remote", "--tags", "origin", `refs/tags/${tagName}`], {
-    cwd: repoRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"]
-  });
-
-  if (result.error) {
-    fail(`Inspect remote release tags failed: ${result.error.message}`);
-  }
-
-  if (typeof result.status === "number" && result.status !== 0) {
-    const stderr = (result.stderr || "").trim();
-    fail(`Inspect remote release tags failed${stderr ? `: ${stderr}` : "."}`);
-  }
-
-  return Boolean((result.stdout || "").trim());
 }
 
 function createLocalCheckpointSnapshot(config, targetKey, dryRun) {
@@ -744,82 +642,59 @@ function createLocalCheckpointSnapshot(config, targetKey, dryRun) {
   console.log(`Created local checkpoint branch '${checkpointBranch}' at ${checkpointCommit}.`);
 }
 
-function createTimestamp() {
-  const now = new Date();
-  const yyyy = String(now.getFullYear());
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  const hh = String(now.getHours()).padStart(2, "0");
-  const min = String(now.getMinutes()).padStart(2, "0");
-  const ss = String(now.getSeconds()).padStart(2, "0");
-
-  return `${yyyy}${mm}${dd}-${hh}${min}${ss}`;
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function runMutableGit(args, dryRun, description, readOnly = false) {
-  if (dryRun && !readOnly) {
-    console.log(`[dry-run] ${description}: git ${args.join(" ")}`);
-    return;
-  }
-
-  const result = spawnSync("git", args, {
-    cwd: repoRoot,
-    stdio: "inherit"
-  });
-
-  if (result.error) {
-    fail(`${description} failed: ${result.error.message}`);
-  }
-
-  if (typeof result.status === "number" && result.status !== 0) {
-    fail(`${description} failed with exit code ${result.status}.`);
-  }
+function sanitizeBranchName(branchName) {
+  return String(branchName).replace(/[^a-zA-Z0-9._-]/g, "-");
 }
 
-function runGitCapture(args, description, allowEmpty = false) {
-  const result = spawnSync("git", args, {
-    cwd: repoRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"]
-  });
+function getStatusReportBranches(config, extraBranches = []) {
+  const branches = new Set(extraBranches);
+  const defaultBranch = (config.branchModel && config.branchModel.productionBranch) || (config.project && config.project.defaultBranch) || "main";
 
-  if (result.error) {
-    fail(`${description} failed: ${result.error.message}`);
+  branches.add(defaultBranch);
+
+  if (config.branchModel && config.branchModel.strategy === "staged") {
+    if (config.branchModel.workingBranch) {
+      branches.add(config.branchModel.workingBranch);
+    }
+
+    if (config.branchModel.stagingBranch) {
+      branches.add(config.branchModel.stagingBranch);
+    }
   }
 
-  if (typeof result.status === "number" && result.status !== 0) {
-    const stderr = (result.stderr || "").trim();
-    fail(`${description} failed${stderr ? `: ${stderr}` : "."}`);
+  const currentBranch = getCurrentBranch();
+  if (currentBranch !== "HEAD") {
+    branches.add(currentBranch);
   }
 
-  const stdout = (result.stdout || "").trim();
-
-  if (!allowEmpty && !stdout) {
-    fail(`${description} returned no output.`);
-  }
-
-  return stdout;
+  return Array.from(branches);
 }
 
-function runShellCommand(command, dryRun, description) {
-  if (dryRun) {
-    console.log(`[dry-run] ${description}: ${command}`);
-    return;
-  }
+function getDeployStatusActions(config, expectedBranch) {
+  const actions = {};
+  actions[expectedBranch] = "Deployed branch.";
 
-  const result = spawnSync(command, {
-    cwd: repoRoot,
-    stdio: "inherit",
-    shell: true
-  });
+  return actions;
+}
 
-  if (result.error) {
-    fail(`${description} failed: ${result.error.message}`);
-  }
+function getDeployNextSteps(expectedBranch) {
+  return [
+    `Check the ${expectedBranch} deploy output above.`,
+    `Return to your working branch when ready: git switch ${expectedBranch === "main" ? "development" : expectedBranch}`
+  ];
+}
 
-  if (typeof result.status === "number" && result.status !== 0) {
-    fail(`${description} failed with exit code ${result.status}.`);
-  }
+function logDeployMechanismMessage(key) {
+  console.log(`Deploy target '${key}' completed via the local platform mechanism.`);
+}
+
+function printUsage(exitCode) {
+  console.log("Usage: node scripts/tctbp-run-deploy.js <target> [--dry-run] [--list] [--allow-dirty-sync] [--docs-updated|\"--no-docs-impact\" \"<reason>\"] [--checkpoint-before-dirty-sync] [--commit-message \"<message>\"]");
+  process.exit(exitCode);
 }
 
 function parseArgs(argv) {
@@ -970,20 +845,4 @@ function logDeployMechanismMessage(targetKey) {
   );
 }
 
-function logSection(title) {
-  console.log(title);
-  console.log("=".repeat(title.length));
-}
-
-function logItem(label, value) {
-  console.log(`${label}: ${value}`);
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function fail(message) {
-  console.error(message);
-  process.exit(1);
-}
+// logSection, logItem, fail, escapeRegExp — imported from core.

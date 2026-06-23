@@ -133,13 +133,16 @@ function main(config, cliOptions) {
     if (syncState.diverged) {
       // SAFETY: never touch a diverged branch.
       skippedCount++;
+      console.log(`\u26A0\uFE0F  WARNING: '${branchName}' has DIVERGED from origin/${branchName} and was NOT updated.`);
+      console.log(`   Local and remote have independent commits. Manual intervention required.`);
+      console.log(`   Inspect: git log --oneline --graph ${branchName}...origin/${branchName}`);
       rows.push({
         origin: `origin/${branchName} @ ${originSha}`,
         local: `${branchName} @ ${localSha}`,
         status: `${branchName}: DIVERGED — skipped`,
         actions:
           "Manual intervention required. Local and remote have independent commits. " +
-          "Do not fast-forward a diverged branch. Inspect with: git log --oneline --graph " + branchName + "...origin/" + branchName,
+          "Do not fast-forward a diverged branch.",
       });
       continue;
     }

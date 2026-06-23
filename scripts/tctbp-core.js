@@ -634,6 +634,58 @@ function runShipGates(dryRun) {
   }
 }
 
+// ── Shared promote/deploy helpers ─────────────────────────────────────────
+
+function resolveTarget(targets, targetArg) {
+  const normalized = String(targetArg).toLowerCase();
+
+  for (const [key, target] of Object.entries(targets)) {
+    const names = [key, ...(target.aliases || [])].map((value) => String(value).toLowerCase());
+
+    if (names.includes(normalized)) {
+      return { key, target };
+    }
+  }
+
+  return null;
+}
+
+function runVerificationGates(config, dryRun, descriptionPrefix = "Verification") {
+  const commands = config.profile && config.profile.commands ? config.profile.commands : {};
+  const configuredBlockingCommands =
+    config.profile && config.profile.verification && Array.isArray(config.profile.verification.blockingCommands)
+      ? config.profile.verification.blockingCommands
+      : ["format", "test", "lint"];
+  const labelMap = {
+    format: "Format",
+    test: "Test",
+    lint: "Lint",
+    build: "Build",
+    "release-build": "Release build"
+  };
+  const verificationCommands = configuredBlockingCommands
+    .map((gateName) => [labelMap[gateName] || gateName, commands[gateName]])
+    .filter(([, command]) => typeof command === "string" && command.trim().length > 0);
+
+  if (verificationCommands.length === 0) {
+    fail("No verification commands are configured in .github/TCTBP.json.");
+  }
+
+  for (const [label, command] of verificationCommands) {
+    runShellCommand(command, dryRun, `${descriptionPrefix}: ${label}`);
+  }
+}
+
+function runBuildGate(config, dryRun, description = "Runtime build gate") {
+  const buildCommand = config.deploy && typeof config.deploy.buildCommand === "string" ? config.deploy.buildCommand : null;
+
+  if (!buildCommand) {
+    return; // No build command configured — not an error for template repos.
+  }
+
+  runShellCommand(buildCommand, dryRun, description);
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -674,11 +726,14 @@ module.exports = {
   repoRoot,
   resolveRepoPath,
   resolveStatusRecommendations,
+  resolveTarget,
+  runBuildGate,
   runCommand,
   runGitCapture,
   runMutableGit,
   runShellCommand,
   runShipGates,
+  runVerificationGates,
   runtimeCwd,
   stepSemVer,
   stopIfBehindOrDiverged,

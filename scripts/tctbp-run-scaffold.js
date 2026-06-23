@@ -88,8 +88,10 @@ async function main(cliOptions) {
   copyPrompts(answers.targetPath);
   gitInit(answers);
   createBranchStructure(answers);
+  await installDependencies(answers, cliOptions);
+  await setupGitRemote(answers, cliOptions);
   smokeTest(answers);
-  printSummary(answers);
+  printSummary(answers, cliOptions);
 }
 
 // ---------------------------------------------------------------------------
@@ -554,6 +556,83 @@ function createBranchStructure(answers) {
   }
 }
 
+// ── Dependency installation ─────────────────────────────────────────────────
+
+async function installDependencies(answers, cliOptions) {
+  if (cliOptions.skipInstall) {
+    console.log("Skipping npm install (--skip-install).");
+    return;
+  }
+
+  const hasDeps = answers.testFramework !== "none";
+  if (!hasDeps) {
+    console.log("No dependencies to install (test framework is none).");
+    return;
+  }
+
+  console.log("Installing dependencies...");
+  const result = spawnSync("npm", ["install"], {
+    cwd: answers.targetPath,
+    stdio: "inherit",
+    shell: process.platform === "win32"
+  });
+
+  if (result.error) {
+    console.log(`  ✗ npm install failed: ${result.error.message}`);
+    console.log("  Run 'npm install' manually in the project directory.");
+    return;
+  }
+
+  if (result.status !== 0) {
+    console.log(`  ✗ npm install exited with code ${result.status}`);
+    console.log("  Run 'npm install' manually in the project directory.");
+    return;
+  }
+
+  console.log("  ✓ Dependencies installed");
+}
+
+// ── Git remote setup ────────────────────────────────────────────────────────
+
+async function setupGitRemote(answers, cliOptions) {
+  if (cliOptions.skipRemote) {
+    return;
+  }
+
+  if (cliOptions.remote) {
+    setRemote(answers.targetPath, cliOptions.remote);
+    return;
+  }
+
+  if (cliOptions.defaults) {
+    return;
+  }
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const ask = (question) => new Promise((resolve) => rl.question(question, resolve));
+
+  const remoteUrl = await ask("GitHub remote URL (or press Enter to skip): ");
+  rl.close();
+
+  if (remoteUrl.trim()) {
+    setRemote(answers.targetPath, remoteUrl.trim());
+  }
+}
+
+function setRemote(targetPath, url) {
+  console.log(`Setting git remote origin → ${url}`);
+  const result = spawnSync("git", ["remote", "add", "origin", url], {
+    cwd: targetPath,
+    stdio: "inherit"
+  });
+
+  if (result.error || result.status !== 0) {
+    console.log("  ✗ Failed to set git remote. Add it manually: git remote add origin <url>");
+  } else {
+    console.log("  ✓ Git remote origin set");
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Smoke test
 // ---------------------------------------------------------------------------
@@ -590,7 +669,7 @@ function smokeTest(answers) {
 // Summary
 // ---------------------------------------------------------------------------
 
-function printSummary(answers) {
+function printSummary(answers, cliOptions) {
   logSection("Scaffold Complete");
   console.log(`Project: ${answers.projectName}`);
   console.log(`Location: ${answers.targetPath}`);
@@ -599,15 +678,18 @@ function printSummary(answers) {
   console.log(`Tests: ${answers.testFramework}`);
 
   console.log("\nNext steps:");
-  console.log(`  1. cd ${answers.targetPath}`);
-  console.log("  2. npm install");
-  if (answers.testFramework !== "none") {
-    console.log("  3. npm run test          # verify the test runner works");
+  if (cliOptions.skipInstall) {
+    console.log(`  1. cd ${answers.targetPath} && npm install`);
+  } else {
+    console.log(`  1. cd ${answers.targetPath}     (dependencies already installed)`);
   }
-  console.log("  4. Add your framework (vite, next, etc.) and start coding");
-  console.log("  5. Update TCTBP.json commands when you add scripts");
+  if (answers.testFramework !== "none") {
+    console.log("  2. npm run test          # verify the test runner works");
+  }
+  console.log("  3. Add your framework (vite, next, etc.) and start coding");
+  console.log("  4. Update TCTBP.json commands when you add scripts");
   if (answers.branchStrategy === "staged") {
-    console.log(`  6. git checkout ${answers.workingBranch} (you should already be there)`);
+    console.log(`  5. git checkout ${answers.workingBranch} (you should already be there)`);
   }
 
   if (answers.deployTarget !== "none yet") {
@@ -622,6 +704,8 @@ function printDryRun(answers) {
   console.log(`Strategy: ${answers.branchStrategy}`);
   console.log(`Deploy target: ${answers.deployTarget}`);
   console.log(`Test framework: ${answers.testFramework}`);
+  console.log("Would run: npm install (use --skip-install to preview without it)");
+  console.log("Would prompt: Git remote URL (use --remote <url> or --skip-remote)");
   console.log("\nNo files or directories were created.");
 }
 
@@ -664,6 +748,9 @@ function parseArgs(args) {
     defaults: false,
     dryRun: false,
     list: false,
+    skipInstall: false,
+    skipRemote: false,
+    remote: null,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -675,8 +762,11 @@ function parseArgs(args) {
       case "--strategy": result.strategy = args[++i]; break;
       case "--deploy": result.deploy = args[++i]; break;
       case "--test": result.test = args[++i]; break;
+      case "--remote": result.remote = args[++i]; break;
       case "--defaults": result.defaults = true; break;
       case "--dry-run": result.dryRun = true; break;
+      case "--skip-install": result.skipInstall = true; break;
+      case "--skip-remote": result.skipRemote = true; break;
       case "--list": result.list = true; break;
     }
   }
@@ -685,7 +775,7 @@ function parseArgs(args) {
 }
 
 function printUsage(exitCode) {
-  console.log("Usage: node scripts/tctbp-run-scaffold.js [--name <name>] [--target <path>] [--working <branch>] [--strategy staged|simple] [--deploy <target>] [--test vitest|jest|none] [--defaults] [--dry-run] [--list]");
+  console.log("Usage: node scripts/tctbp-run-scaffold.js [--name <name>] [--target <path>] [--working <branch>] [--strategy staged|simple] [--deploy <target>] [--test vitest|jest|none] [--remote <url>] [--defaults] [--dry-run] [--skip-install] [--skip-remote] [--list]");
   process.exit(exitCode || 0);
 }
 

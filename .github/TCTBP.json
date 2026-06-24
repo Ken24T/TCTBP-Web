@@ -12,7 +12,10 @@
     "description": "Canonical template repository for web/browser-based projects using the TCTBP workflow with deterministic Node.js runners, staged branch model, code-loss prevention, and a project scaffold factory.",
     "defaultBranch": "main",
     "packageManager": "npm",
-    "versionFiles": ["VERSION", "package.json"],
+    "versionFiles": [
+      "VERSION",
+      "package.json"
+    ],
     "changelogFormat": "keep-a-changelog",
     "locale": "en-US"
   },
@@ -51,7 +54,9 @@
       "releaseBuild": null
     },
     "verification": {
-      "blockingCommands": ["test"],
+      "blockingCommands": [
+        "test"
+      ],
       "comment": "Blocking verification for promote, deploy, and release workflows uses test. Lint and build are added as blocking gates when the project configures them."
     },
     "qualityGates": {
@@ -161,7 +166,14 @@
     }
   },
   "scaffold": {
-    "preferredTriggers": ["scaffold", "scaffold please", "scaffold web", "scaffold web please", "new project", "create project"],
+    "preferredTriggers": [
+      "scaffold",
+      "scaffold please",
+      "scaffold web",
+      "scaffold web please",
+      "new project",
+      "create project"
+    ],
     "executionCommand": "node scripts/tctbp-run-scaffold.js",
     "dryRunCommand": "node scripts/tctbp-run-scaffold.js --dry-run",
     "purpose": "Create a new web project with the full TCTBP-Web runtime surface pre-installed and configured from interactive answers. The new project opens on the working branch ready for development.",
@@ -176,11 +188,18 @@
     "comment": "Scaffold asks 6 questions (project name, target path, working branch, branch strategy, deploy target, test framework), creates the project from scratch, runs git init, writes the full TCTBP-Web runtime surface, generates a populated TCTBP.json profile, creates the branch structure, opens on the working branch, and smoke-tests the installed runners."
   },
   "ship": {
-    "preferredTriggers": ["ship", "ship please", "shipping", "prepare release"],
+    "preferredTriggers": [
+      "ship",
+      "ship please",
+      "shipping",
+      "prepare release"
+    ],
     "executionCommand": "node scripts/tctbp-run-ship.js --no-docs-impact \"<reason>\" --yes",
     "requireFetchedOriginInPreflight": true,
     "stopIfDetachedHead": true,
-    "allowedBranches": ["main"],
+    "allowedBranches": [
+      "main"
+    ],
     "stopIfBranchNotAllowed": true,
     "stopIfBranchMissingUpstream": false,
     "allowShipFromUnpublishedBranch": true,
@@ -192,7 +211,10 @@
     "branchPolicyComment": "Reserve SHIP for main so tags remain production release markers."
   },
   "publish": {
-    "preferredTriggers": ["publish", "publish please"],
+    "preferredTriggers": [
+      "publish",
+      "publish please"
+    ],
     "executionCommand": "node scripts/tctbp-run-publish.js",
     "requireFetchedOriginInPreflight": true,
     "stopIfDetachedHead": true,
@@ -205,7 +227,10 @@
     "purpose": "Safely publish the current clean branch to origin, including first publication when no upstream exists yet, without bumping version, creating a tag, or changing deployment state."
   },
   "checkpoint": {
-    "preferredTriggers": ["checkpoint", "checkpoint please"],
+    "preferredTriggers": [
+      "checkpoint",
+      "checkpoint please"
+    ],
     "executionCommand": "node scripts/tctbp-run-checkpoint.js",
     "purpose": "Create a durable local-only checkpoint commit on the current branch so work is preserved without version, tag, metadata, or remote side effects.",
     "stopIfDetachedHead": true,
@@ -229,9 +254,18 @@
     "reuseDuringHandoverWhenCurrent": true
   },
   "handover": {
-    "preferredTriggers": ["handover", "handover please", "handover local", "handover local please"],
+    "preferredTriggers": [
+      "handover",
+      "handover please",
+      "handover local",
+      "handover local please"
+    ],
     "executionCommand": "node scripts/tctbp-run-handover.js",
     "purpose": "Safely checkpoint and publish the active branch so development can continue on another machine without promoting code between environment branches.",
+    "requireNote": true,
+    "noteDescription": "A 2-5 sentence Copilot-written narrative describing the session's work, design decisions, and unfinished items. Ensures orient/resume can recover full context beyond git stats.",
+    "continueWithoutNote": false,
+    "allowNoContinuation": true,
     "stopIfDetachedHead": true,
     "stopIfBranchBehindUpstream": true,
     "stopIfBranchDiverged": true,
@@ -239,7 +273,10 @@
     "pushCurrentBranchOnly": true,
     "pushTagsWhenShipOccurs": true,
     "localOnlyVariant": {
-      "triggers": ["handover local", "handover local please"],
+      "triggers": [
+        "handover local",
+        "handover local please"
+      ],
       "pushNever": true,
       "purpose": "Create a local-only handover checkpoint without publishing to origin."
     },
@@ -253,7 +290,10 @@
     "comment": "Handover is a sync workflow, not a promotion workflow. It publishes the current branch only and must not stop local runtime processes automatically."
   },
   "resume": {
-    "preferredTriggers": ["resume", "resume please"],
+    "preferredTriggers": [
+      "resume",
+      "resume please"
+    ],
     "executionCommand": "node scripts/tctbp-run-resume.js",
     "dryRunCommand": "node scripts/tctbp-run-resume.js --dry-run",
     "purpose": "Safely fast-forward local branches that are behind their origin counterpart after switching machines or returning to active development. Diverged branches are always skipped. The working tree must be clean before resuming.",
@@ -267,7 +307,9 @@
     "comment": "Resume is a read-and-sync workflow only. It never rewrites history, never force-pushes, and never switches branches. Diverged branches are reported but never mutated."
   },
   "abort": {
-    "preferredTriggers": ["abort"],
+    "preferredTriggers": [
+      "abort"
+    ],
     "executionCommand": "node scripts/tctbp-run-abort.js",
     "dryRunCommand": "node scripts/tctbp-run-abort.js --dry-run",
     "purpose": "Inspect partial workflow state and propose deterministic recovery actions before executing any local abort operation. By default this runner is preview-only and requires --apply for execution.",
@@ -278,7 +320,14 @@
     "comment": "Abort executes only local git abort commands when explicitly approved. It never force-pushes, never rewrites history, and does not mutate remote state."
   },
   "gate": {
-    "preferredTriggers": ["run tests", "run lint", "run build", "gate test", "gate lint", "gate build"],
+    "preferredTriggers": [
+      "run tests",
+      "run lint",
+      "run build",
+      "gate test",
+      "gate lint",
+      "gate build"
+    ],
     "executionCommand": "node scripts/tctbp-run-gate.js <test|lint|build>",
     "commandMap": {
       "run tests": "node scripts/tctbp-run-gate.js test",
@@ -292,14 +341,20 @@
     "comment": "Gates report 'not configured' gracefully when the corresponding command is null in the profile."
   },
   "version": {
-    "preferredTriggers": ["version status", "version check"],
+    "preferredTriggers": [
+      "version status",
+      "version check"
+    ],
     "executionCommand": "node scripts/tctbp-run-version.js",
     "strictCommand": "node scripts/tctbp-run-version.js --strict",
     "purpose": "Report branch/version/tag alignment using a consistent TCTBP runner entrypoint.",
     "comment": "Use 'version status' for informational output and 'version check' when strict mismatch exit semantics are required."
   },
   "rollback": {
-    "preferredTriggers": ["rollback", "revert last checkpoint"],
+    "preferredTriggers": [
+      "rollback",
+      "revert last checkpoint"
+    ],
     "executionCommand": "node scripts/tctbp-run-rollback.js",
     "dryRunCommand": "node scripts/tctbp-run-rollback.js --dry-run",
     "applyCommand": "node scripts/tctbp-run-rollback.js --apply",
@@ -308,24 +363,128 @@
     "comment": "Rollback is intended for undoing checkpoint commits only and uses git revert (never reset/rewrite history)."
   },
   "workflow": {
-    "shipOrder": ["preflight", "test", "problems", "docs-impact", "bump", "commit", "tag", "push"],
-    "publishOrder": ["preflight", "fetch", "report", "verify-gate", "push-if-needed", "verify-sync", "summary"],
-    "checkpointOrder": ["preflight", "inspect", "stage", "commit", "summary"],
-    "branchOrder": ["assess-ship", "verify-or-stop", "inspect-source-branch", "sync-default-branch", "confirm-merge-into-default-when-needed", "merge-source-into-default-when-needed", "verify-transition", "create-new-branch-when-requested", "optional-cleanup", "summary"],
-    "handoverOrder": ["preflight", "stage", "test-gate", "docs-impact", "commit", "ship-if-needed", "push", "verify-sync", "summary"],
-    "resumeOrder": ["preflight", "fetch", "detect-branch", "pull", "verify-sync", "verification-gate", "summary"],
-    "statusOrder": ["fetch", "report", "recommend"],
-    "abortOrder": ["inspect", "propose", "execute"],
-    "promoteOrder": ["preflight", "source-verification-gate", "docs-impact", "source-build", "source-sync", "target-safety-snapshot", "target-merge", "merge-deletion-audit", "target-verification-gate", "target-build", "target-publish-or-stop", "summary"],
-    "deployOrder": ["preflight", "verification-gate", "docs-impact", "runtime-build", "sync-prerequisite", "deploy-target", "post-deploy-validation", "summary"],
-    "scaffoldOrder": ["interview", "validate", "create-directory", "write-project-skeleton", "copy-tctbp-runtime", "generate-profile", "git-init", "create-branch-structure", "smoke-test", "summary"],
-    "requireApproval": ["push", "delete-branch", "force-push", "rewrite-history", "modify-remotes"]
+    "shipOrder": [
+      "preflight",
+      "test",
+      "problems",
+      "docs-impact",
+      "bump",
+      "commit",
+      "tag",
+      "push"
+    ],
+    "publishOrder": [
+      "preflight",
+      "fetch",
+      "report",
+      "verify-gate",
+      "push-if-needed",
+      "verify-sync",
+      "summary"
+    ],
+    "checkpointOrder": [
+      "preflight",
+      "inspect",
+      "stage",
+      "commit",
+      "summary"
+    ],
+    "branchOrder": [
+      "assess-ship",
+      "verify-or-stop",
+      "inspect-source-branch",
+      "sync-default-branch",
+      "confirm-merge-into-default-when-needed",
+      "merge-source-into-default-when-needed",
+      "verify-transition",
+      "create-new-branch-when-requested",
+      "optional-cleanup",
+      "summary"
+    ],
+    "handoverOrder": [
+      "preflight",
+      "stage",
+      "test-gate",
+      "docs-impact",
+      "commit",
+      "ship-if-needed",
+      "push",
+      "verify-sync",
+      "summary"
+    ],
+    "resumeOrder": [
+      "preflight",
+      "fetch",
+      "detect-branch",
+      "pull",
+      "verify-sync",
+      "verification-gate",
+      "summary"
+    ],
+    "statusOrder": [
+      "fetch",
+      "report",
+      "recommend"
+    ],
+    "abortOrder": [
+      "inspect",
+      "propose",
+      "execute"
+    ],
+    "promoteOrder": [
+      "preflight",
+      "source-verification-gate",
+      "docs-impact",
+      "source-build",
+      "source-sync",
+      "target-safety-snapshot",
+      "target-merge",
+      "merge-deletion-audit",
+      "target-verification-gate",
+      "target-build",
+      "target-publish-or-stop",
+      "summary"
+    ],
+    "deployOrder": [
+      "preflight",
+      "verification-gate",
+      "docs-impact",
+      "runtime-build",
+      "sync-prerequisite",
+      "deploy-target",
+      "post-deploy-validation",
+      "summary"
+    ],
+    "scaffoldOrder": [
+      "interview",
+      "validate",
+      "create-directory",
+      "write-project-skeleton",
+      "copy-tctbp-runtime",
+      "generate-profile",
+      "git-init",
+      "create-branch-structure",
+      "smoke-test",
+      "summary"
+    ],
+    "requireApproval": [
+      "push",
+      "delete-branch",
+      "force-push",
+      "rewrite-history",
+      "modify-remotes"
+    ]
   },
   "shipReport": {
     "enabled": true,
     "stage": "preflight",
     "format": "table",
-    "columns": ["Origin", "Local", "Status", "Action(s)"],
+    "columns": [
+      "Origin",
+      "Local",
+      "Status",
+      "Action(s)"
+    ],
     "recommendedRows": [
       "branch-and-upstream",
       "head-commit",
@@ -341,7 +500,12 @@
     "enabled": true,
     "stage": "report",
     "format": "table",
-    "columns": ["Origin", "Local", "Status", "Action(s)"],
+    "columns": [
+      "Origin",
+      "Local",
+      "Status",
+      "Action(s)"
+    ],
     "recommendedRows": [
       "branch-and-upstream",
       "head-commit",
@@ -360,7 +524,12 @@
     "enabled": true,
     "stage": "summary",
     "format": "table",
-    "columns": ["Origin", "Local", "Status", "Action(s)"],
+    "columns": [
+      "Origin",
+      "Local",
+      "Status",
+      "Action(s)"
+    ],
     "recommendedRows": [
       "current-branch-state",
       "head-commit",
@@ -374,7 +543,12 @@
     "enabled": true,
     "stage": "summary",
     "format": "table",
-    "columns": ["Origin", "Local", "Status", "Action(s)"],
+    "columns": [
+      "Origin",
+      "Local",
+      "Status",
+      "Action(s)"
+    ],
     "recommendedRows": [
       "previous-head-commit",
       "checkpoint-commit",
@@ -386,7 +560,15 @@
   },
   "statusRecommendations": {
     "enabled": true,
-    "suggestions": ["abort", "resume", "checkpoint", "publish", "ship", "handover", "none"],
+    "suggestions": [
+      "abort",
+      "resume",
+      "checkpoint",
+      "publish",
+      "ship",
+      "handover",
+      "none"
+    ],
     "priorityNote": "Array is ordered by priority: recover partial state first, then resume/sync, then local preservation, then publish, then ship, then handover.",
     "rules": {
       "resume": "Suggest when the active work branch or default branch does not match origin, or when resuming on another machine would require a clean fast-forward.",
@@ -440,7 +622,16 @@
   },
   "promote": {
     "enabled": true,
-    "preferredTriggers": ["promote", "promote please", "promote staging", "promote staging please", "promote production", "promote production please", "promote prod", "promote prod please"],
+    "preferredTriggers": [
+      "promote",
+      "promote please",
+      "promote staging",
+      "promote staging please",
+      "promote production",
+      "promote production please",
+      "promote prod",
+      "promote prod please"
+    ],
     "executionCommand": "node scripts/tctbp-run-promote.js <staging|production> --no-docs-impact \"<reason>\"",
     "purpose": "Explicitly merge the current source branch into the target environment branch with verification gates, safety snapshots, and a mandatory merge deletion audit. Promotion is a merge workflow, not a deploy workflow.",
     "targets": {
@@ -468,7 +659,9 @@
         "comment": "Use when the current development candidate should become the field-testing staging candidate."
       },
       "production": {
-        "aliases": ["prod"],
+        "aliases": [
+          "prod"
+        ],
         "sourceBranch": "staging",
         "targetBranch": "main",
         "description": "Promote the current staging candidate into main as the next production release candidate.",
@@ -493,7 +686,13 @@
     "comment": "Promotion is explicit. Use promote staging for development-to-staging and promote production for staging-to-main. Promotion is a merge workflow, not a deploy workflow. When branchModel.strategy is 'simple', promote is a no-op."
   },
   "deploy": {
-    "preferredTriggers": ["deploy dev", "deploy development", "deploy staging", "deploy prod", "deploy production"],
+    "preferredTriggers": [
+      "deploy dev",
+      "deploy development",
+      "deploy staging",
+      "deploy prod",
+      "deploy production"
+    ],
     "purpose": "Deploy the current environment branch to its mapped runtime environment. Deployment never promotes code between branches.",
     "stopIfDetachedHead": true,
     "requireCleanTree": false,
@@ -515,7 +714,9 @@
       "staging": "staging",
       "main": "production"
     },
-    "requireShipFirstForTargets": ["production"],
+    "requireShipFirstForTargets": [
+      "production"
+    ],
     "deployDoesNotPromote": true,
     "promotionNotes": [
       "Use promote staging before running deploy staging.",
@@ -523,7 +724,9 @@
     ],
     "targets": {
       "dev": {
-        "aliases": ["development"],
+        "aliases": [
+          "development"
+        ],
         "expectedBranch": "development",
         "description": "Deploy the development branch to the development environment.",
         "preDeploySyncStrategy": "commit-and-publish-current-branch-when-needed",
@@ -565,7 +768,9 @@
         "comment": "Staging deploy publishes already-committed staging state after verification succeeds."
       },
       "production": {
-        "aliases": ["prod"],
+        "aliases": [
+          "prod"
+        ],
         "expectedBranch": "main",
         "description": "Deploy the main branch to the production environment.",
         "preDeploySyncStrategy": "require-already-published-shipped-branch",
@@ -593,9 +798,18 @@
     "safetyTagsLocalOnlyByDefault": true,
     "mergeDeletionAudit": {
       "enabled": true,
-      "warnThreshold": { "files": 1, "lines": 500 },
-      "stopThreshold": { "files": 5, "lines": 500 },
-      "hardStopThreshold": { "files": 20, "lines": 2000 },
+      "warnThreshold": {
+        "files": 1,
+        "lines": 500
+      },
+      "stopThreshold": {
+        "files": 5,
+        "lines": 500
+      },
+      "hardStopThreshold": {
+        "files": 20,
+        "lines": 2000
+      },
       "stopMessage": "This merge deletes {files} files ({lines} lines). Type 'confirm deletions' to proceed.",
       "hardStopMessage": "This looks like a destructive tree reset, not a normal merge. Review carefully before proceeding."
     },
@@ -607,8 +821,15 @@
     "comment": "Code-loss prevention gates apply to branch closeout merges, promote merges, and any agent-performed merge into a default or environment branch."
   },
   "docsInfraPolicy": {
-    "skipSteps": ["test"],
-    "keepSteps": ["preflight", "problems", "commit", "push"],
+    "skipSteps": [
+      "test"
+    ],
+    "keepSteps": [
+      "preflight",
+      "problems",
+      "commit",
+      "push"
+    ],
     "filePatterns": [
       "*.md",
       "*.json",
@@ -621,7 +842,12 @@
       "LICENSE*",
       "CONTRIBUTING*"
     ],
-    "excludeWhenCodePresent": ["*.ts", "*.tsx", "*.js", "*.jsx"],
+    "excludeWhenCodePresent": [
+      "*.ts",
+      "*.tsx",
+      "*.js",
+      "*.jsx"
+    ],
     "comment": "For docs/infra-only changes: skip heavy verification, keep editor diagnostics and config validation."
   },
   "documentation": {
@@ -639,23 +865,42 @@
     "rules": [
       {
         "changeType": "user-visible-feature",
-        "review": ["README.md", ".github/TCTBP Cheatsheet.md", ".github/TCTBP Agent.md"]
+        "review": [
+          "README.md",
+          ".github/TCTBP Cheatsheet.md",
+          ".github/TCTBP Agent.md"
+        ]
       },
       {
         "changeType": "ui-or-interaction",
-        "review": ["README.md", ".github/TCTBP Cheatsheet.md"]
+        "review": [
+          "README.md",
+          ".github/TCTBP Cheatsheet.md"
+        ]
       },
       {
         "changeType": "config-or-settings",
-        "review": ["README.md", ".github/copilot-instructions.md", ".github/TCTBP.json"]
+        "review": [
+          "README.md",
+          ".github/copilot-instructions.md",
+          ".github/TCTBP.json"
+        ]
       },
       {
         "changeType": "packaging-or-metadata",
-        "review": ["README.md", "VERSION", "package.json", ".github/copilot-instructions.md"]
+        "review": [
+          "README.md",
+          "VERSION",
+          "package.json",
+          ".github/copilot-instructions.md"
+        ]
       },
       {
         "changeType": "roadmap-or-status",
-        "review": ["README.md", ".github/TCTBP Cheatsheet.md"]
+        "review": [
+          "README.md",
+          ".github/TCTBP Cheatsheet.md"
+        ]
       },
       {
         "changeType": "internal-only",
@@ -669,7 +914,10 @@
     "patchEveryShip": true,
     "patchEveryShipForDocsInfrastructureOnly": true,
     "minorOnFirstShipOfBranch": true,
-    "minorBranchPrefixes": ["slice/", "feature/"],
+    "minorBranchPrefixes": [
+      "slice/",
+      "feature/"
+    ],
     "majorExplicitOnly": true
   },
   "tagging": {
@@ -694,8 +942,14 @@
       "vitest.config.ts.template"
     ],
     "conditionalFiles": {
-      "vitest": ["vitest.config.ts.template", "src/placeholder.test.ts.template"],
-      "jest": ["jest.config.ts.template", "src/placeholder.test.ts.template"],
+      "vitest": [
+        "vitest.config.ts.template",
+        "src/placeholder.test.ts.template"
+      ],
+      "jest": [
+        "jest.config.ts.template",
+        "src/placeholder.test.ts.template"
+      ],
       "none": []
     },
     "comment": "Template files use {{PLACEHOLDER}} syntax for values provided during the scaffold interview."

@@ -32,6 +32,7 @@ const RUNNER_FILES = [
   "tctbp-run-version.js",
   "tctbp-run-rollback.js",
   "tctbp-run-runtime-advisory.js",
+  "tctbp-run-orient.js",
   "tctbp-run-workflow.js",
   "tctbp-status-report.js",
   "tctbp-scaffold-cli.js",

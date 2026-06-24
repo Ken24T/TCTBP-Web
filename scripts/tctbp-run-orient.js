@@ -47,6 +47,40 @@ while ((match = bulletRegex.exec(summarySection)) !== null) {
   bullets.push(match[1].trim());
 }
 
+// Fallback: extract auto-generated summary stats when no Copilot note
+let autoStats = "";
+if (bullets.length === 0) {
+  const sessionSummaryStart = content.indexOf("## Session Summary");
+  const sessionSummaryEnd = filesStart > 0 ? filesStart : content.length;
+  if (sessionSummaryStart >= 0) {
+    const sessionSection = content.slice(sessionSummaryStart, sessionSummaryEnd);
+    const statLines = sessionSection.split("\n")
+      .filter((l) => l.trim().length > 0 && !l.startsWith("#") && !l.startsWith("*"))
+      .map((l) => l.trim());
+    if (statLines.length > 0) {
+      autoStats = statLines.join("\n  ");
+    }
+  }
+  // Also parse directory breakdown
+  const byDirStart = content.indexOf("### By Directory");
+  if (byDirStart >= 0) {
+    const byDirEnd = content.indexOf("##", byDirStart + 5);
+    const dirSection = byDirEnd >= 0 ? content.slice(byDirStart, byDirEnd) : content.slice(byDirStart);
+    const dirLines = dirSection.split("\n")
+      .filter((l) => l.includes("|") && l.includes("/"))
+      .map((l) => {
+        const parts = l.split("|").map((p) => p.trim()).filter((p) => p.length > 0);
+        return parts.length >= 2 ? `${parts[0]} — ${parts[1]} files` : l.trim();
+      });
+    if (dirLines.length > 0) {
+      autoStats += "\n\n  Directories:";
+      for (const d of dirLines) {
+        autoStats += `\n  ${d}`;
+      }
+    }
+  }
+}
+
 console.log("");
 console.log("═".repeat(60));
 console.log("  ORIENT — Previous Session Summary");
@@ -68,8 +102,11 @@ if (bullets.length > 0) {
   if (bullets.length > 20) {
     console.log(`  ... and ${bullets.length - 20} more`);
   }
-  console.log("");
+} else if (autoStats.length > 0) {
+  console.log("  Session stats:");
+  console.log(`  ${autoStats}`);
 }
+console.log("");
 
 // Extract Gotchas
 const gotchasStart = content.indexOf("### Gotchas");

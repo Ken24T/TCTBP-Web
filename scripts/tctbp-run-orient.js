@@ -23,11 +23,10 @@ console.log("═".repeat(64));
 
 if (files.length === 0) {
   console.log("");
-  console.log("  No continuation files found in this repo.");
+  console.log("  No continuation file found in this repo.");
   console.log("");
-  console.log("  Use 'handover please' before ending a session to create one.");
-  console.log("  The Copilot agent will write a full session summary");
-  console.log("  with accomplishments, decisions, gotchas, and next steps.");
+  console.log("  This appears to be a fresh session with no prior context.");
+  console.log("  Use 'handover please' before ending to save context for next time.");
   console.log("");
   console.log("═".repeat(64));
   process.exit(0);
@@ -37,125 +36,95 @@ const newest = files[files.length - 1];
 const filePath = path.join(continuationDir, newest);
 const content = fs.readFileSync(filePath, "utf8");
 
-// ── Parse ────────────────────────────────────────────────────────────────
+// ── Parse key facts ──────────────────────────────────────────────────────
 
 const dateMatch = content.match(/^# Handover Continuation — (.+)$/m);
 const branchMatch = content.match(/\*\*Branch:\*\*\s*(\S+)/);
 const commitMatch = content.match(/\*\*Last commit:\*\*\s*(\S+)/);
-const rangeMatch = content.match(/\*\*Session range:\*\*\s*(\S+)/);
-const hasCopilotNote = content.includes("## Copilot Session Summary");
+const hasNarrative = content.includes("## Copilot Session Summary");
 
-// Accomplishments from Copilot narrative
-const acc = [];
-if (hasCopilotNote) {
-  const noteStart = content.indexOf("### What was accomplished");
-  const nextH3 = content.indexOf("###", noteStart + 10);
-  const accSection = nextH3 >= 0 ? content.slice(noteStart, nextH3) : content.slice(noteStart);
-  const re = /^-\s+(.+)$/gm;
-  let m;
-  while ((m = re.exec(accSection)) !== null) acc.push(m[1].trim());
-}
-
-// Gotchas
-const gotchas = [];
-const gs = content.indexOf("### Gotchas");
-if (gs >= 0) {
-  const ge = content.indexOf("##", gs + 10);
-  const gSection = ge >= 0 ? content.slice(gs, ge) : content.slice(gs);
-  const gre = /^\d+\.\s+(.+)$/gm;
-  let m;
-  while ((m = gre.exec(gSection)) !== null) gotchas.push(m[1].trim());
-}
-
-// Next session
-const nextItems = [];
+// Extract next-session lines
+const nextLines = [];
 const ns = content.indexOf("### Next session");
 if (ns >= 0) {
   const ne = content.indexOf("##", ns + 10);
   const nSection = ne >= 0 ? content.slice(ns, ne) : content.slice(ns);
-  const nre = /^-\s+(.+)$/gm;
+  const re = /^-\s+(.+)$/gm;
   let m;
-  while ((m = nre.exec(nSection)) !== null) {
+  while ((m = re.exec(nSection)) !== null) {
     const line = m[1].trim();
-    if (line.startsWith("Primary:") || line.startsWith("Secondary:")) nextItems.push(line);
+    if (line.startsWith("Primary:") || line.startsWith("Secondary:")) {
+      nextLines.push(line.replace(/`/g, ""));
+    }
   }
 }
 
-// Repos referenced
-const repos = [];
-const rre = /`(\/home\/[^`]+\/repos\/[^`]+)`/g;
-let r;
-while ((r = rre.exec(content)) !== null) {
-  if (!repos.includes(r[1])) repos.push(r[1]);
+// Extract gotchas for quick reference
+const gotchaCount = (content.match(/^\d+\.\s+/gm) || []).length;
+
+// Count files touched
+const fileCountMatch = content.match(/across (\d+) file\(s\)/);
+const deltaMatch = content.match(/Net change: ([+-]\d+) lines/);
+
+// ── Welcome-back report ──────────────────────────────────────────────────
+
+console.log("");
+console.log("  📋 CONTINUATION FILE LOADED");
+console.log("");
+console.log(`  Source:  .tctbp/continuation/${newest}`);
+console.log(`  From:    ${dateMatch ? dateMatch[1] : "unknown"}`);
+console.log(`  Branch:  ${branchMatch ? branchMatch[1] : "unknown"}`);
+console.log(`  Commit:  ${commitMatch ? commitMatch[1] : "unknown"}  `);
+console.log(`  Repo:    ${repoName}`);
+console.log(`  Files:   ${files.length} continuation(s) total`);
+console.log("");
+
+if (hasNarrative) {
+  console.log("  ✅ This continuation file contains a full Copilot-written");
+  console.log("     session summary with narrative context — what was done,");
+  console.log("     key decisions, gotchas, and next steps.");
+  console.log("");
+  console.log("     The previous Copilot left instructions. I have read them.");
+  console.log("     This session continues from where that one ended.");
+} else {
+  console.log("  ⚠️  This file has git stats but no Copilot narrative.");
+  console.log("     I can see what files changed but not the reasoning.");
+  console.log("     An earlier file may have richer context.");
 }
 
-// Auto stats
-const newMatch = content.match(/(\d+) new file\(s\)/);
-const modMatch = content.match(/(\d+) modified/);
-const deltaMatch = content.match(/Net change: ([+-]\d+) lines/);
-const fileMatch = content.match(/across (\d+) file\(s\)/);
-
-// ── Report ───────────────────────────────────────────────────────────────
-
-console.log("");
-console.log("  📋 INTERPRETATION");
-console.log("");
-
-if (dateMatch) console.log(`  Left off:  ${dateMatch[1]}`);
-if (branchMatch) console.log(`  Branch:    ${branchMatch[1]}`);
-if (commitMatch) console.log(`  Commit:    ${commitMatch[1]}`);
-if (rangeMatch) console.log(`  Range:     ${rangeMatch[1]}`);
-console.log(`  Files:     ${files.length} continuation(s), using newest`);
-
-if (hasCopilotNote) {
+if (fileCountMatch) {
   console.log("");
-  console.log("  ✅ Full Copilot session summary — narrative context present.");
+  console.log("  📊 Previous session scope:");
+  console.log(`     ${fileCountMatch[0]}`);
+  if (deltaMatch) console.log(`     ${deltaMatch[0]}`);
+}
+
+if (nextLines.length > 0) {
+  console.log("");
+  console.log("  ▸ The previous session left these next steps:");
+  for (const line of nextLines) {
+    console.log(`    ${line}`);
+  }
+}
+
+if (gotchaCount > 0 && hasNarrative) {
+  console.log("");
+  console.log(`  ⚠️  ${gotchaCount} gotcha(s) recorded — I'll watch for these.`);
+}
+
+console.log("");
+console.log("═".repeat(64));
+
+if (hasNarrative) {
+  console.log("");
+  console.log("  This is a CONTINUED session. The previous Copilot's");
+  console.log("  context has been loaded. Ask me anything about the");
+  console.log("  prior work — I know what was done, why, and what's next.");
 } else {
   console.log("");
-  console.log("  ⚠️  Git-only summary in this file. An earlier file may have richer context.");
+  console.log("  Git context loaded. I can see what changed but I don't");
+  console.log("  have the previous Copilot's reasoning. Use 'handover");
+  console.log("  please' with --note next time for full continuity.");
 }
 
-if (fileMatch) {
-  console.log("");
-  console.log("  📊 SCOPE");
-  if (newMatch) console.log(`  New:       ${newMatch[1]} files`);
-  if (modMatch) console.log(`  Modified:  ${modMatch[1]} files`);
-  if (deltaMatch) console.log(`  Delta:     ${deltaMatch[1]} lines`);
-}
-
-if (acc.length > 0) {
-  console.log("");
-  console.log("  🎯 ACCOMPLISHMENTS");
-  for (const item of acc.slice(0, 15)) {
-    console.log(`  • ${item.replace(/\\`/g, "`")}`);
-  }
-  if (acc.length > 15) console.log(`  ... and ${acc.length - 15} more`);
-}
-
-if (gotchas.length > 0) {
-  console.log("");
-  console.log("  ⚠️  GOTCHAS");
-  for (const g of gotchas.slice(0, 6)) {
-    console.log(`  ${g.substring(0, 118)}${g.length > 118 ? "..." : ""}`);
-  }
-}
-
-if (nextItems.length > 0) {
-  console.log("");
-  console.log("  ▸ NEXT");
-  for (const item of nextItems) console.log(`  ${item}`);
-}
-
-if (repos.length > 0) {
-  console.log("");
-  console.log("  📁 REPOS");
-  for (const p of repos) console.log(`  ${p}`);
-}
-
-console.log("");
-console.log("═".repeat(64));
-const confidence = hasCopilotNote ? "HIGH — full narrative + git context" : "MEDIUM — git context, enough to resume";
-console.log(`  Confidence: ${confidence}`);
-console.log(`  Source: ${filePath}`);
-console.log("═".repeat(64));
 console.log("");

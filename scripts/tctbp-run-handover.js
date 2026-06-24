@@ -46,6 +46,7 @@ async function main(config, cliOptions) {
   }
 
   logSection("Handover");
+  logItem("Repo", repoRoot.split("/").pop() || repoRoot);
   logItem("Branch", branch);
   logItem("Mode", cliOptions.localOnly ? "local-only" : cliOptions.dryRun ? "dry-run" : "live");
 

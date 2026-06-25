@@ -236,24 +236,31 @@ Executable path: `node scripts/tctbp-run-handover.js`
 
 The `handover local` variant creates a local-only checkpoint without pushing to origin.
 
-### Note Requirement (Mandatory)
+### Note Requirement (Automatic)
 
-**Every handover invocation MUST include `--note "<markdown>"`** with a meaningful Copilot-written narrative describing what was accomplished, key decisions, and the reasoning behind changes. This ensures `orient` / `resume` can recover full context — not just git stats.
+**Every handover invocation MUST include a session narrative** so `orient` / `resume` can recover full context — not just git stats.
 
-- The note should be 2–5 sentences summarizing the session's work, design decisions, and any unfinished items.
-- If the user provides their own note text inline (e.g., `handover please --note "..."`), use it verbatim.
-- If the user does not provide a note, the agent MUST compose one from the session context before invoking the runner.
+The note is resolved in this order:
+1. `--note "<markdown>"` — user-provided text (highest priority)
+2. `--note-file <path>` — agent writes session context to a temp file, passes the path
+3. Auto-generated from git commit messages (fallback)
+
+**Agent procedure when the user does not provide a note:**
+1. Compose a 2–5 sentence narrative from the session's chat context: what was done, key design decisions, gotchas encountered, and unfinished items.
+2. Write the narrative to a temp file: `/tmp/tctbp-handover-note-<timestamp>.md`
+3. Invoke the runner: `node scripts/tctbp-run-handover.js --note-file /tmp/tctbp-handover-note-<timestamp>.md`
+4. Clean up the temp file after the runner completes.
+
+- If the user provides their own note text inline (e.g., `handover please --note "..."`), use it verbatim and skip the file step.
 - The only exception is `--no-continuation`, which skips the continuation file entirely.
-
-The runner merges this narrative with auto-generated git context (files touched, checkpoint log, branch state).
 
 Behaviour:
 
-1. **Preflight** — Report repo, branch and working tree. Stop if `HEAD` is detached or a git operation is in progress. Run the runtime advisory to report active dev servers.
+1. **Preflight** — Report branch and working tree. Stop if `HEAD` is detached or a git operation is in progress. Run the runtime advisory to report active dev servers.
 2. **Stage and commit** — Preserve dirty work. If already clean, skip.
 3. **Verification** — Run gates appropriate to the change type. Skip heavy gates for docs/infra-only.
 4. **Docs impact** — Assess and record before committing.
-5. **Push** — Push the active branch. Skip push for `handover local`.
+5. **Push** — Push the active branch. Push tags only when a SHIP occurred on `main`. Skip push for `handover local`.
 6. **Verify sync** — Confirm branch matches origin. Stop on discrepancy.
 7. **Summary** — Render the handover summary table as a standalone Markdown block, followed by a completion line naming the handed-over branch and commit.
 

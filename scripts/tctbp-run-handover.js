@@ -308,17 +308,37 @@ async function writeContinuationNote(_config, cliOptions, branch, commit) {
     ? `${meaningfulCommits.length} meaningful commit(s) — checkpoint commits excluded.`
     : "";
 
-  const copilotNote = cliOptions.note || "";
+  // Resolve note: --note takes priority, then --note-file, then auto-generate
+  let copilotNote = cliOptions.note || "";
+  if (!copilotNote.trim() && cliOptions.noteFile) {
+    try {
+      copilotNote = fs.readFileSync(cliOptions.noteFile, "utf8").trim();
+      if (copilotNote) {
+        console.log(`Session note loaded from ${cliOptions.noteFile}`);
+      }
+    } catch (e) {
+      console.log(`⚠️  Could not read --note-file ${cliOptions.noteFile}: ${e.message}`);
+    }
+  }
+
   const summarySection = copilotNote.trim()
     ? copilotNote.trim()
-    : [
-        `${commitList.length} commit(s) across ${diffLines.length} file(s) since ${sessionStartRef}.`,
-        `${newFiles.length} new file(s), ${modifiedFiles.length} modified. ${netDeltaLine}`,
+    : buildAutoSummary(
+        commitList,
+        meaningfulCommits,
+        diffLines,
+        newFiles,
+        modifiedFiles,
+        totalAdded,
+        totalRemoved,
+        netDelta,
+        deltaLabel,
+        netDeltaLine,
         meaningfulLine,
-        "",
-        dirSummary ? "### By Directory" : "",
-        dirSummary || "",
-      ].filter((l) => l.length > 0).join("\n");
+        byDir,
+        dirSummary,
+        sessionStartRef
+      );
 
   const treeStatus = workingTree.trim()
     ? `\`\`\`\n${workingTree}\n\`\`\``
@@ -358,16 +378,138 @@ async function writeContinuationNote(_config, cliOptions, branch, commit) {
   console.log(`\nContinuation file: .tctbp/continuation/${fileName}`);
   console.log(`Auto-generated from git: ${commitList.length} commits, ${diffLines.length} files`);
 
-  // Stage, commit, and push
+  // Prune old continuation files, keeping the most recent N
+  const maxFiles = (_config && _config.handover && typeof _config.handover.maxContinuationFiles === "number")
+    ? _config.handover.maxContinuationFiles
+    : 5;
+  pruneContinuationFiles(continuationDir, maxFiles);
+
+  // Stage, commit, and push (skip push for local-only)
   spawnSync("git", ["add", ".tctbp/continuation/"], { cwd: repoRoot, stdio: "inherit" });
   const commitResult = spawnSync("git", ["commit", "-m", "handover: continuation note"], { cwd: repoRoot, stdio: "inherit" });
 
   if (commitResult.status === 0) {
-    spawnSync("git", ["push", "origin", branch], { cwd: repoRoot, stdio: "inherit" });
-    console.log("Committed and pushed.");
+    if (cliOptions.localOnly) {
+      console.log("Committed (local-only — not pushed).");
+    } else {
+      spawnSync("git", ["push", "origin", branch], { cwd: repoRoot, stdio: "inherit" });
+      console.log("Committed and pushed.");
+    }
   }
 
   return true;
+}
+
+/**
+ * Prune old continuation files, keeping only the most recent `maxFiles`.
+ * Files are sorted by name (timestamped), so oldest sort first.
+ */
+function pruneContinuationFiles(continuationDir, maxFiles) {
+  const fs = require("fs");
+  const path = require("path");
+
+  let files = [];
+  try {
+    files = fs.readdirSync(continuationDir)
+      .filter((name) => name.endsWith(".md"))
+      .sort();
+  } catch (_) {
+    return; // directory doesn't exist yet
+  }
+
+  if (files.length <= maxFiles) return;
+
+  const toDelete = files.slice(0, files.length - maxFiles);
+
+  for (const name of toDelete) {
+    const filePath = path.join(continuationDir, name);
+    try {
+      fs.unlinkSync(filePath);
+      console.log(`Pruned old continuation: .tctbp/continuation/${name}`);
+    } catch (e) {
+      console.log(`⚠️  Could not prune ${name}: ${e.message}`);
+    }
+  }
+
+  if (toDelete.length > 0) {
+    console.log(`Pruned ${toDelete.length} old continuation file(s) — kept ${maxFiles} most recent.`);
+  }
+}
+
+/**
+ * Build an auto-generated summary from git context when no --note is provided.
+ * Uses meaningful commit messages as the primary narrative content.
+ */
+function buildAutoSummary(
+  commitList,
+  meaningfulCommits,
+  diffLines,
+  newFiles,
+  modifiedFiles,
+  totalAdded,
+  totalRemoved,
+  netDelta,
+  deltaLabel,
+  netDeltaLine,
+  meaningfulLine,
+  byDir,
+  dirSummary,
+  sessionStartRef
+) {
+  const parts = [];
+
+  // Header noting this is auto-generated
+  parts.push("*Auto-generated from git context — no Copilot narrative was provided.*");
+  parts.push("");
+
+  // Use meaningful commit messages as the work summary
+  if (meaningfulCommits.length > 0) {
+    parts.push("**Work done this session:**");
+    parts.push("");
+    for (const c of meaningfulCommits) {
+      const firstSpace = c.indexOf(" ");
+      const msg = firstSpace > 0 ? c.slice(firstSpace + 1).trim() : c.trim();
+      parts.push(`- ${msg}`);
+    }
+    parts.push("");
+  } else if (commitList.length > 0) {
+    parts.push("**Work done this session:**");
+    parts.push("");
+    for (const c of commitList) {
+      const firstSpace = c.indexOf(" ");
+      const msg = firstSpace > 0 ? c.slice(firstSpace + 1).trim() : c.trim();
+      parts.push(`- ${msg}`);
+    }
+    parts.push("");
+  } else {
+    parts.push("_No commits in this session range._");
+    parts.push("");
+  }
+
+  // Stats footer
+  const stats = [];
+  if (commitList.length > 0) {
+    stats.push(`${commitList.length} commit(s) across ${diffLines.length} file(s) since ${sessionStartRef}.`);
+  }
+  if (newFiles.length > 0 || modifiedFiles.length > 0) {
+    stats.push(`${newFiles.length} new, ${modifiedFiles.length} modified.`);
+  }
+  if (netDelta !== 0) {
+    stats.push(`${netDeltaLine}`);
+  }
+  if (stats.length > 0) {
+    parts.push(stats.join(" "));
+  }
+
+  // Directory breakdown
+  if (Object.keys(byDir).length > 0) {
+    parts.push("");
+    parts.push("### By Directory");
+    parts.push("");
+    parts.push(dirSummary);
+  }
+
+  return parts.join("\n");
 }
 
 function resolveSessionStartRef() {
@@ -413,7 +555,8 @@ function parseArgs(argv) {
     list: false,
     localOnly: false,
     noContinuation: false,
-    note: null
+    note: null,
+    noteFile: null
   };
 
   for (const arg of argv) {
@@ -444,6 +587,17 @@ function parseArgs(argv) {
       break;
     }
 
+    if (arg === "--note-file") {
+      const idx = argv.indexOf(arg);
+      if (idx + 1 >= argv.length) {
+        fail("--note-file requires a path argument.");
+      }
+      parsed.noteFile = argv[idx + 1];
+      // skip the next arg (the path)
+      argv.splice(idx, 1);
+      continue;
+    }
+
     fail(`Unknown option '${arg}'.`);
   }
 
@@ -451,6 +605,6 @@ function parseArgs(argv) {
 }
 
 function printUsage(exitCode) {
-  console.log("Usage: node scripts/tctbp-run-handover.js [--dry-run] [--local-only] [--no-continuation] [--note \"<markdown>\"] [--list]");
+  console.log("Usage: node scripts/tctbp-run-handover.js [--dry-run] [--local-only] [--no-continuation] [--note \"<markdown>\"] [--note-file <path>] [--list]");
   process.exit(exitCode);
 }

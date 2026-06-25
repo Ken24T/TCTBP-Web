@@ -266,6 +266,7 @@
     "noteDescription": "A 2-5 sentence Copilot-written narrative describing the session's work, design decisions, and unfinished items. Ensures orient/resume can recover full context beyond git stats.",
     "continueWithoutNote": false,
     "allowNoContinuation": true,
+    "maxContinuationFiles": 5,
     "stopIfDetachedHead": true,
     "stopIfBranchBehindUpstream": true,
     "stopIfBranchDiverged": true,

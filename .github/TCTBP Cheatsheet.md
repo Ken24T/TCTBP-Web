@@ -16,8 +16,11 @@ Use [TCTBP Agent.md](TCTBP%20Agent.md) for the full workflow rules and guard rai
 | handover local | `node scripts/tctbp-run-handover.js --local-only` | Local commit only |
 | resume | `node scripts/tctbp-run-resume.js` | Local sync only |
 | orient | Copilot reads continuation context | No |
-| promote | `node scripts/tctbp-run-promote.js <staging\|production>` | Local/remote per target policy |
-| deploy | `node scripts/tctbp-run-deploy.js <dev\|staging\|production>` | Local/remote per target policy |
+| promote | `node scripts/tctbp-run-promote.js <staging\|review\|production>` | Local/remote per target policy |
+| deploy | `node scripts/tctbp-run-deploy.js <dev\|staging\|review\|production>` | Local/remote per target policy |
+| release | `node scripts/tctbp-run-release.js --no-docs-impact "<reason>"` | Full pipeline compose |
+| ticket | `node scripts/tctbp-run-ticket.js <create\|report\|triage> ...` | `create` writes only with `--apply` |
+| workflow | `node scripts/tctbp-run-workflow.js <deploy\|promote\|branch> ...` | Routes to sub-runners |
 | branch | `node scripts/tctbp-run-branch.js [new-branch-name]` | Local merge/branch ops |
 | ship | `node scripts/tctbp-run-ship.js --no-docs-impact "<reason>" --yes` | Commit/tag/push on `main` |
 | abort | `node scripts/tctbp-run-abort.js --dry-run` | Preview by default |
@@ -41,7 +44,7 @@ Quick safety notes:
 
 ## Branch Model
 
-Two strategies, configured in `TCTBP.json` under `branchModel.strategy`:
+Three strategies, configured in `TCTBP.json` under `branchModel.strategy`:
 
 **Simple** (`"simple"`): Single production branch (`main`). Used by TCTBP-Web itself and libraries.
 
@@ -50,6 +53,12 @@ Two strategies, configured in `TCTBP.json` under `branchModel.strategy`:
 - `development` — day-to-day working branch
 - `staging` — field-testing and review branch
 - `main` — production release branch
+
+**Long-lived environment branches** (`"long-lived-environment-branches"`): Three named branches with explicit promote and deploy:
+
+- `development` — daily coding and internal verification
+- `review` — user field testing
+- `main` — production releases
 
 Promotion is a merge step between these branches. Deployment never performs the promotion merge for you.
 

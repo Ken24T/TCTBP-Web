@@ -34,6 +34,8 @@ const RUNNER_FILES = [
   "tctbp-run-runtime-advisory.js",
   "tctbp-run-orient.js",
   "tctbp-run-workflow.js",
+  "tctbp-run-release.js",
+  "tctbp-run-ticket.js",
   "tctbp-status-report.js",
   "tctbp-scaffold-cli.js",
   "tctbp-scaffold-profile.js",
@@ -109,7 +111,7 @@ async function interview(cliOptions) {
   const projectName = cliOptions.name || await ask("Project name: ");
   const targetPath = cliOptions.target || await ask("Target directory (absolute path): ");
   const workingBranch = cliOptions.working || await ask(`Working branch name [development]: `) || "development";
-  const branchStrategy = cliOptions.strategy || await ask(`Branch strategy: staged (development→staging→main) or simple (main only) [staged]: `) || "staged";
+  const branchStrategy = cliOptions.strategy || await ask(`Branch strategy: staged (development→staging→main), long-lived (development→review→main), or simple (main only) [staged]: `) || "staged";
   const framework = cliOptions.framework || await ask(`Framework: vite (React+TS), or none [vite]: `) || "vite";
   const deployTarget = cliOptions.deploy || await ask(`Deploy target: Vercel, Netlify, Cloudflare Pages, Docker, or none yet [none yet]: `) || "none yet";
   const testFramework = cliOptions.test || await ask(`Test framework: vitest, jest, or none [vitest]: `) || "vitest";
@@ -163,8 +165,13 @@ function validateAnswers(answers) {
     fail(`Working branch cannot be '${answers.workingBranch}'. Choose a different name.`);
   }
 
-  if (!["staged", "simple"].includes(answers.branchStrategy)) {
-    fail("Branch strategy must be 'staged' or 'simple'.");
+  if (!["staged", "simple", "long-lived-environment-branches", "long-lived"].includes(answers.branchStrategy.toLowerCase())) {
+    fail("Branch strategy must be 'staged', 'simple', or 'long-lived-environment-branches'.");
+  }
+
+  // Normalise long-lived alias
+  if (answers.branchStrategy.toLowerCase() === "long-lived") {
+    answers.branchStrategy = "long-lived-environment-branches";
   }
 
   if (!["vite", "none"].includes(answers.framework)) {
@@ -221,7 +228,10 @@ function substitute(template, answers) {
 
   let branchDiagram = "";
   let branchStrategyDesc = "";
-  if (isStaged) {
+  if (isLongLived) {
+    branchStrategyDesc = "long-lived environment branches model";
+    branchDiagram = `\`\`\`\n${answers.workingBranch} ──promote review──▶ review ──promote production──▶ main\n     │                                  │                                  │\n     ▼                                  ▼                                  ▼\n deploy dev                      deploy review                    ship → deploy prod\n\`\`\``;
+  } else if (isStaged) {
     branchStrategyDesc = "staged branch model";
     branchDiagram = `\`\`\`\n${answers.workingBranch} ──promote staging──▶ staging ──promote production──▶ main\n     │                                  │                                  │\n     ▼                                  ▼                                  ▼\n deploy dev                      deploy staging                    ship → deploy prod\n\`\`\``;
   } else {
@@ -430,19 +440,28 @@ function generateProfile(answers) {
       locale: "en-US",
     },
     branchModel: isStaged
-      ? {
-          strategy: "staged",
-          workingBranch: answers.workingBranch,
-          stagingBranch: "staging",
-          productionBranch: "main",
-          promoteEnabled: true,
-          deployStagingEnabled: true,
-        }
+      ? (isLongLived
+        ? {
+            strategy: "long-lived-environment-branches",
+            workingBranch: answers.workingBranch,
+            reviewBranch: "review",
+            productionBranch: "main",
+            promoteEnabled: true,
+            deployEnabled: true,
+          }
+        : {
+            strategy: "staged",
+            workingBranch: answers.workingBranch,
+            stagingBranch: "staging",
+            productionBranch: "main",
+            promoteEnabled: true,
+            deployEnabled: true,
+          })
       : {
           strategy: "simple",
           productionBranch: "main",
           promoteEnabled: false,
-          deployStagingEnabled: false,
+          deployEnabled: false,
         },
     profile: {
       runtimeCwd: ".",
@@ -492,6 +511,7 @@ function generateProfile(answers) {
         "checkpoint", "checkpoint please",
         "publish", "publish please",
         "promote", "promote please", "promote staging", "promote staging please",
+        "promote review", "promote review please",
         "promote production", "promote production please", "promote prod", "promote prod please",
         "deploy", "deploy please", "deploy dev", "deploy dev please",
         "deploy development", "deploy development please",
@@ -501,6 +521,7 @@ function generateProfile(answers) {
         "resume", "resume please", "orient", "orient please",
         "status", "status please", "abort",
         "run tests", "run lint", "run build", "gate test", "gate lint", "gate build",
+        "ticket create", "ticket report", "ticket triage",
         "version status", "version check",
         "rollback", "revert last checkpoint",
       ],
@@ -585,6 +606,16 @@ function generateDeployTargets(answers) {
 
   if (answers.branchStrategy === "simple") {
     delete baseTargets.dev;
+    delete baseTargets.staging;
+  }
+
+  // For long-lived strategy, rename staging target to review
+  if (answers.branchStrategy === "long-lived-environment-branches") {
+    baseTargets.review = {
+      ...baseTargets.staging,
+      expectedBranch: "review",
+      description: "Deploy review to the review/field-testing environment.",
+    };
     delete baseTargets.staging;
   }
 

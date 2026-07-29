@@ -6,7 +6,7 @@ This agent governs **milestone, checkpointing, shipping, sync, promotion, deploy
 
 Primary objective: **no code is ever lost** while keeping local and remote repositories in a validated, recoverable state.
 
-This agent is **not** for exploratory coding or refactoring. It is activated only when the user signals a configured TCTBP trigger (for example `ship`, `checkpoint`, `handover`, `resume`, `promote staging`, `deploy dev`, `run tests`, `version status`, `rollback`, or `scaffold`).
+This agent is **not** for exploratory coding or refactoring. It is activated only when the user signals a configured TCTBP trigger (for example `ship`, `checkpoint`, `handover`, `resume`, `promote staging`, `promote review`, `deploy dev`, `run tests`, `ticket create`, `version status`, `rollback`, `release`, or `scaffold`).
 
 Quick reference: see [TCTBP Cheatsheet.md](TCTBP%20Cheatsheet.md) for the short operator view of triggers, gates, and repo-specific expectations.
 
@@ -31,7 +31,7 @@ A Project Profile defines:
 - How to run **tests**, **lint**, **build**, and **format** checks
 - Where and how to **bump version**
 - Tagging policy
-- Branch model (simple or staged)
+- Branch model (simple, staged, or long-lived-environment-branches)
 - Documentation impact rules and which docs must be reviewed for different change types
 - Deployment targets and post-deploy validation rules
 

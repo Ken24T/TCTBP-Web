@@ -51,7 +51,7 @@ async function main(config, cliOptions) {
   logItem("Active listeners", String(activeResults.length));
 
   if (results.length === 0) {
-    console.log("No DDRE runtime listeners are configured for handover advisory.");
+    console.log("No runtime listeners are configured for handover advisory.");
     return 0;
   }
 
@@ -68,7 +68,7 @@ async function main(config, cliOptions) {
       "Advice: Report only. If you are handing over runtime ownership as well as git state, stop these listeners separately before moving machines."
     );
   } else {
-    console.log("Advice: No configured DDRE runtime listeners are currently active.");
+    console.log("Advice: No configured runtime listeners are currently active.");
   }
 
   console.log("This advisory never blocks handover.");

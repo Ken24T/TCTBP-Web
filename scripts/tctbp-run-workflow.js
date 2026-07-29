@@ -12,7 +12,6 @@ const {
   repoRoot,
   summariseWorkingTree
 } = require("./tctbp-core");
-const { syncRoadmapReleaseNotes } = require("./roadmap-release-notes");
 
 const options = parseArgs(process.argv.slice(2));
 
@@ -52,8 +51,7 @@ async function main(config, cliOptions) {
     await maybeHandleGuidedDirtyDeploy(targetInfo, passthroughArgs);
   }
 
-  if (cliOptions.workflow === "promote" && targetInfo.key === "review") {
-    await maybeHandleReleaseNotesPreview(targetInfo, passthroughArgs);
+  if (cliOptions.workflow === "promote" && (targetInfo.key === "staging" || targetInfo.key === "review")) {
     await maybeHandleGuidedDirtyPromote(targetInfo, passthroughArgs);
   }
 
@@ -136,7 +134,7 @@ async function maybeHandleGuidedDirtyPromote(targetInfo, passthroughArgs) {
     "These paths will be staged into the source sync commit if you continue:"
   );
 
-  const approved = await askYesNo("Create the development source sync commit and continue with promote review? (y/N) ");
+  const approved = await askYesNo("Create the source sync commit and continue with promotion? (y/N) ");
 
   if (!approved) {
     fail("Promotion stopped because the dirty source sync was not confirmed.");
@@ -151,30 +149,6 @@ async function maybeHandleGuidedDirtyPromote(targetInfo, passthroughArgs) {
       passthroughArgs.push("--checkpoint-before-dirty-source-sync");
     }
   }
-}
-
-async function maybeHandleReleaseNotesPreview(targetInfo, passthroughArgs) {
-  const branch = getCurrentBranch();
-
-  if (branch !== targetInfo.target.sourceBranch) {
-    return;
-  }
-
-  const workingTreeStatus = getWorkingTreeStatus();
-  if (!summariseWorkingTree(workingTreeStatus).isClean) {
-    return;
-  }
-
-  const preview = await syncRoadmapReleaseNotes({
-    dryRun: true,
-    repoRoot
-  });
-
-  if (!preview.wouldChange || passthroughArgs.includes("--allow-dirty-source-sync")) {
-    return;
-  }
-
-  passthroughArgs.push("--allow-dirty-source-sync");
 }
 
 function askYesNo(prompt) {

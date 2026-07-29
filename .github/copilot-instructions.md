@@ -28,6 +28,11 @@ The TCTBP-Web template set is defined by:
 - `scripts/tctbp-pretool-hook.js` for the hook logic
 - `scripts/tctbp-runtime.js` for repo root and profile resolution
 - `scripts/tctbp-core.js` for the shared runner library (git ops, gates, JSON, tables)
+- `scripts/tctbp-gates.js` for verification gates, build gates, and ship gates
+- `scripts/tctbp-git-ops.js` for raw git execution, fetch, branch inspection, and sync state
+- `scripts/tctbp-output.js` for logging, table formatting, working-tree summaries, and recommendations
+- `scripts/tctbp-profile-io.js` for profile I/O, semver parsing, and version source resolution
+- `scripts/tctbp-status-report.js` for post-trigger status report rendering
 - `scripts/tctbp-run-*.js` for individual deterministic workflow runners
 - `scripts/tctbp-run-scaffold.js` for the project factory
 - `.github/prompts/` for reusable reconcile and scaffold prompts
@@ -56,8 +61,8 @@ Use these rules whenever you edit or extend the template set.
 When the scaffold creates a new project, it populates these values from the interview answers. When reconciling an existing project, replace these manually:
 
 - project name and description
-- branch strategy (`"simple"` or `"staged"`)
-- working branch name (for staged strategy)
+- branch strategy (`"simple"`, `"staged"`, or `"long-lived-environment-branches"`)
+- working branch name (for staged/long-lived strategies)
 - version files (default: `package.json`)
 - test, lint, build, and format commands
 - dev server port for runtime advisory
@@ -88,6 +93,42 @@ Changes in this repository should improve one or more of:
 - runner correctness and profile-driven determinism
 - consistency between the JSON profile and the Markdown guidance
 
+## Handover Continuation Prompts
+
+When performing a `handover`, compose a continuation file at `.tctbp/continuation/YYYY-MM-DD-HHmm.md` (UTC, 24-hour time). This lets a session on another machine pick up where this session left off. Use this structure:
+
+```markdown
+# Handover Continuation — YYYY-MM-DD
+
+## Session Summary
+What was accomplished, key decisions, intentionally deferred work.
+
+## Plan Progress
+Which chunks/tasks completed, which is next, and the relevant plan file.
+
+## Files Touched
+Key files modified or created with a short note on what changed in each.
+
+## Tickets
+Tickets worked on and any still-open for the next session.
+
+## Checkpoint Log
+Commit hashes created this session in order with one-line messages.
+
+## Mistakes & Gotchas
+Things that went wrong and how they were fixed. Include WHY, not just WHAT.
+
+## Branch & Commit Context
+- Machine, branch, last commit, working tree state, upstream sync, remote URL.
+
+## Next Session
+The recommended first action for the next session. Be specific.
+```
+
+For `handover local`, the continuation file is committed locally only — no push to origin. This is useful for same-machine context preservation between chat sessions.
+
+Say `orient` or `pick up from handover` in the next session to load the newest continuation file.
+
 ## Workflow Expectations
 
 For TCTBP activation, workflow order, sync safety, docs-impact checks, versioning, tagging, and approvals, follow:
@@ -96,16 +137,18 @@ For TCTBP activation, workflow order, sync safety, docs-impact checks, versionin
 - `.github/TCTBP Agent.md` for behavioural interpretation and guard rails
 - `.github/TCTBP Cheatsheet.md` for short operator guidance
 
-Supported triggers include all canonical TCTBP triggers plus `scaffold`, `promote`, targeted `deploy`, `gate`, `version`, `rollback`, and `handover local`.
+Supported triggers include all canonical TCTBP triggers plus `scaffold`, `promote` (staging/review/production), targeted `deploy` (dev/staging/production), `gate` (test/lint/build), `ticket` (create/report/triage), `version` (status/check), `rollback`, `release`, and `handover local`.
 
 ## Relationship to Canonical TCTBP
 
 TCTBP-Web is a specialised downstream of the canonical [TCTBP](https://github.com/Ken24T/TCTBP) repository. It reuses the canonical agent model and workflow vocabulary while adding:
 
-- Deterministic Node.js runners for every workflow
-- A staged branch model with explicit `promote` and per-environment `deploy`
+- Deterministic Node.js runners for every workflow (status, checkpoint, publish, handover, resume, abort, ship, branch, rollback, version, gate, deploy, promote, release, ticket, scaffold)
+- Three branch strategies: `simple` (single branch), `staged` (development → staging → production), and `long-lived-environment-branches` (development → review → production)
+- Explicit `promote` and per-environment `deploy` workflows
 - Code-loss prevention (safety tags, merge deletion audits, pre-push net-deletion checks)
 - A `scaffold` trigger that creates fully-instrumented new web projects
+- Handover continuation prompts for multi-machine development
 
 When reconciling a web project, you can reconcile from either the canonical TCTBP repo or from TCTBP-Web. Use TCTBP-Web as the source when the target project should gain the runner architecture and staged branch model.
 

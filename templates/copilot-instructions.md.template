@@ -66,6 +66,40 @@ This repo uses TCTBP-Web for branch safety, versioning, and deployment. Key file
 
 When you see TCTBP triggers (checkpoint, ship, promote, etc.), those are handled by the TCTBP agent, not by you. Don't try to implement workflow steps manually.
 
+## Handover & Continuation Prompts
+
+When the user says `handover` or `handover please`, compose a continuation file at `.tctbp/continuation/YYYY-MM-DD-HHmm.md` (UTC, 24-hour time) before the handover script runs. This timestamped filename prevents same-day overwrites. Use this structure:
+
+```markdown
+# Handover Continuation — YYYY-MM-DD
+
+## Session Summary
+What was accomplished this session. Key decisions made and why. Unfinished work intentionally deferred.
+
+## Plan Progress
+Which chunks/tasks completed, which is next, and the relevant plan file.
+
+## Files Touched
+Key files modified or created with a short note on what changed in each.
+
+## Tickets
+Tickets worked on and any still-open for the next session.
+
+## Checkpoint Log
+Commit hashes created in order with one-line messages.
+
+## Mistakes & Gotchas
+Things that went wrong and how they were fixed. Include WHY, not just WHAT.
+
+## Branch & Commit Context
+- Machine, branch, last commit, working tree state, upstream sync, remote URL.
+
+## Next Session
+The recommended first action for the next session. Be specific.
+```
+
+For `handover local`, skip the publish step — the file is committed locally only. Say `orient` or `pick up from handover` in the next session to pick up the newest continuation file.
+
 {{BRANCH_MODEL_NOTE}}
 
 ## Project-Specific Conventions

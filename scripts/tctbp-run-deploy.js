@@ -2,7 +2,6 @@
 
 const fs = require("fs");
 const path = require("path");
-const { spawnSync } = require("child_process");
 const { captureBranchSnapshots, printPostTriggerStatusReport } = require("./tctbp-status-report");
 const { resolvePolicyPath, resolveRepoRoot } = require("./tctbp-runtime");
 const {
@@ -97,7 +96,7 @@ function main(config, targetInfo, cliOptions) {
   runMutableGit(["fetch", "--prune", "origin"], cliOptions.dryRun, "Fetch origin before deploy preflight");
 
   let remoteExists = gitRefExists(remoteRef);
-  let remoteState = inspectRemoteState(expectedBranch, remoteExists);
+  const remoteState = inspectBranchSyncState(expectedBranch, { remoteExists, localRef: "HEAD" });
 
   stopIfBehindOrDiverged(remoteState, remoteBranchLabel, "Deploy");
   stopIfUnpublishedOrAhead(target, key, remoteExists, remoteState, remoteBranchLabel);
@@ -147,7 +146,7 @@ function main(config, targetInfo, cliOptions) {
       );
     }
 
-    printDirtySyncSummary(preflightStatus);
+    printDirtySummary(preflightStatus, "Deploy sync summary", "These paths will be staged into the deploy sync commit:");
 
     if (cliOptions.checkpointBeforeDirtySync) {
       createLocalCheckpointSnapshot(config, key, cliOptions.dryRun);
@@ -164,7 +163,7 @@ function main(config, targetInfo, cliOptions) {
   }
 
   remoteExists = gitRefExists(remoteRef);
-  remoteState = inspectRemoteState(expectedBranch, remoteExists);
+  remoteState = inspectBranchSyncState(expectedBranch, { remoteExists, localRef: "HEAD" });
   stopIfBehindOrDiverged(remoteState, remoteBranchLabel, "Deploy");
   stopIfUnpublishedOrAhead(target, key, remoteExists, remoteState, remoteBranchLabel);
 
@@ -231,147 +230,12 @@ function runRuntimePublishStep(config, targetKey, expectedBranch, dryRun) {
   runShellCommand(command, dryRun, `Publish local ${targetKey} runtime bundle`);
 }
 
-// inspectRemoteState kept locally: thin deploy-specific wrapper.
-function inspectRemoteState(branch, remoteExists) {
-  if (!remoteExists) {
-    return {
-      ahead: 0,
-      behind: 0,
-      diverged: false
-    };
-  }
-
-  const output = runGitCapture(["rev-list", "--left-right", "--count", `HEAD...refs/remotes/origin/${branch}`], "Inspect branch sync state");
-  const parts = output.split(/\s+/).map((value) => Number.parseInt(value, 10));
-
-  if (parts.length !== 2 || parts.some((value) => Number.isNaN(value))) {
-    fail(`Could not parse branch sync state output: '${output}'.`);
-  }
-
-  return {
-    ahead: parts[0],
-    behind: parts[1],
-    diverged: parts[0] > 0 && parts[1] > 0
-  };
-}
+// All core functions imported above — no local redefinitions needed.
+// inspectRemoteState replaced with inspectBranchSyncState from core.
+// printDirtySyncSummary replaced with printDirtySummary from core.
+// runMutableGit, classifyStatusLine imported from core.
 
 function stopIfUnpublishedOrAhead(target, key, remoteExists, remoteState, remoteBranchLabel) {
-  if (target.requireSyncedBranchBeforeDeployAction && !remoteExists) {
-    fail(`Deploy target '${key}' requires an existing published branch at ${remoteBranchLabel}.`);
-  }
-
-  if (target.requireSyncedBranchBeforeDeployAction && remoteState.ahead > 0) {
-    fail(`Deploy target '${key}' requires already-published synced branch state; ${remoteBranchLabel} is missing ${remoteState.ahead} local commit(s).`);
-  }
-}
-
-// stopIfBehindOrDiverged removed: imported from core with "Deploy" prefix.
-
-// printDirtySyncSummary kept locally: deploy-specific single-param signature.
-function printDirtySyncSummary(statusOutput) {
-  const lines = statusOutput
-    .split(/\r?\n/)
-    .map((value) => value.trimEnd())
-    .filter((value) => value.length > 0);
-
-  if (lines.length === 0) {
-    return;
-  }
-
-  const counts = {
-    modified: 0,
-    added: 0,
-    deleted: 0,
-    renamed: 0,
-    copied: 0,
-    untracked: 0,
-    other: 0
-  };
-
-  for (const line of lines) {
-    const category = classifyStatusLine(line);
-    counts[category] += 1;
-  }
-
-  const summaryParts = [
-    ["modified", counts.modified],
-    ["added", counts.added],
-    ["deleted", counts.deleted],
-    ["renamed", counts.renamed],
-    ["copied", counts.copied],
-    ["untracked", counts.untracked],
-    ["other", counts.other]
-  ]
-    .filter(([, count]) => count > 0)
-    .map(([label, count]) => `${count} ${label}`);
-
-  console.log(`Dirty sync summary (${lines.length} file(s)): ${summaryParts.join(", ")}`);
-  console.log("These paths will be staged into the deploy sync commit:");
-
-  for (const line of lines) {
-    console.log(`- ${line}`);
-  }
-}
-
-function classifyStatusLine(line) {
-  const code = line.slice(0, 2);
-
-  if (code === "??") {
-    return "untracked";
-  }
-
-  const significantCode = code.replace(/\s/g, "");
-
-  if (significantCode.includes("R")) {
-    return "renamed";
-  }
-
-  if (significantCode.includes("C")) {
-    return "copied";
-  }
-
-  if (significantCode.includes("D")) {
-    return "deleted";
-  }
-
-  if (significantCode.includes("A")) {
-    return "added";
-  }
-
-  if (significantCode.includes("M")) {
-    return "modified";
-  }
-
-  return "other";
-}
-
-// classifyStatusLine kept locally: core doesn't export it directly.
-// getReleaseTagsPointingAtHead, getReleaseTagPattern, gitRemoteTagExists,
-// createTimestamp, runGitCapture, runShellCommand — imported from core.
-// stopIfBehindOrDiverged — imported from core with "Deploy" prefix.
-
-// runMutableGit kept locally: deploy-specific readOnly parameter signature.
-function runMutableGit(args, dryRun, description, readOnly = false) {
-  if (dryRun && !readOnly) {
-    console.log(`[dry-run] ${description}: git ${args.join(" ")}`);
-    return;
-  }
-
-  const result = spawnSync("git", args, {
-    cwd: repoRoot,
-    stdio: "inherit"
-  });
-
-  if (result.error) {
-    fail(`${description} failed: ${result.error.message}`);
-  }
-
-  if (typeof result.status === "number" && result.status !== 0) {
-    fail(`${description} failed with exit code ${result.status}.`);
-  }
-}
-
-function findPublishedReleaseTag(tags) {
   for (const tag of tags) {
     if (gitRemoteTagExists(tag)) {
       return tag;

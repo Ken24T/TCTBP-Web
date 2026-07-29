@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 const fs = require("fs");
-const { spawnSync } = require("child_process");
 const { captureBranchSnapshots, printPostTriggerStatusReport } = require("./tctbp-status-report");
 const { resolvePolicyPath, resolveRepoRoot } = require("./tctbp-runtime");
 const {
@@ -85,7 +84,7 @@ async function main(config, targetInfo, cliOptions) {
   runMutableGit(["fetch", "--prune", "origin"], cliOptions.dryRun, "Fetch origin before promotion preflight");
 
   let sourceRemoteExists = gitRemoteBranchExists(sourceBranch);
-  let sourceRemoteState = inspectBranchSyncState(sourceBranch, sourceRemoteExists, true);
+  let sourceRemoteState = inspectBranchSyncState(sourceBranch, { remoteExists: sourceRemoteExists, localRef: "HEAD" });
 
   stopIfBehindOrDiverged(sourceRemoteState, `origin/${sourceBranch}`);
 
@@ -132,7 +131,7 @@ async function main(config, targetInfo, cliOptions) {
       console.log("Source sync contains only generated review promotion metadata; committing it automatically.");
     }
 
-    printDirtySyncSummary(preflightSourceStatus, "source promotion sync");
+    printDirtySummary(preflightSourceStatus, "Source promotion sync summary", "These paths will be staged into the source sync commit:");
 
     if (cliOptions.checkpointBeforeDirtySourceSync) {
       createLocalCheckpointSnapshot(config, `promote-${key}`, cliOptions.dryRun);
@@ -149,7 +148,7 @@ async function main(config, targetInfo, cliOptions) {
   }
 
   sourceRemoteExists = gitRemoteBranchExists(sourceBranch);
-  sourceRemoteState = inspectBranchSyncState(sourceBranch, sourceRemoteExists, true);
+  sourceRemoteState = inspectBranchSyncState(sourceBranch, { remoteExists: sourceRemoteExists, localRef: "HEAD" });
   stopIfBehindOrDiverged(sourceRemoteState, `origin/${sourceBranch}`, "Promotion");
 
   publishBranchIfNeeded({
@@ -193,7 +192,7 @@ async function main(config, targetInfo, cliOptions) {
   }
 
   const targetRemoteExists = gitRemoteBranchExists(targetBranch);
-  const targetRemoteState = inspectBranchSyncState(targetBranch, targetRemoteExists, false, cliOptions.dryRun);
+  const targetRemoteState = inspectBranchSyncState(targetBranch, { remoteExists: targetRemoteExists });
 
   if (target.publishTargetAfterPromotion) {
     stopIfBehindOrDiverged(targetRemoteState, `origin/${targetBranch}`, "Promotion");
@@ -241,34 +240,8 @@ async function main(config, targetInfo, cliOptions) {
   });
 }
 
-// inspectBranchSyncState kept locally: promote needs allowEmpty passthrough for dry-run tolerance.
-function inspectBranchSyncState(branchName, remoteExists, currentBranchState = false, dryRun = false) {
-  if (!remoteExists) {
-    return {
-      ahead: 0,
-      behind: 0,
-      diverged: false
-    };
-  }
-
-  const localRef = currentBranchState ? "HEAD" : `refs/heads/${branchName}`;
-  const output = runGitCapture(
-    ["rev-list", "--left-right", "--count", `${localRef}...refs/remotes/origin/${branchName}`],
-    `Inspect sync state for ${branchName}`,
-    dryRun
-  );
-  const parts = output.split(/\s+/).map((value) => Number.parseInt(value, 10));
-
-  if (parts.length !== 2 || parts.some((value) => Number.isNaN(value))) {
-    fail(`Could not parse branch sync state output for ${branchName}: '${output}'.`);
-  }
-
-  return {
-    ahead: parts[0],
-    behind: parts[1],
-    diverged: parts[0] > 0 && parts[1] > 0
-  };
-}
+// All core functions imported above — no local redefinitions needed.
+// inspectBranchSyncState, printDirtySummary, classifyStatusLine, runMutableGit imported from core.
 
 function publishBranchIfNeeded({ branchName, remoteExists, remoteState, dryRun, allowFirstPublish, publishEnabled, purposeLabel }) {
   if (!publishEnabled) {
@@ -308,7 +281,7 @@ function prepareTargetBranch(target, dryRun) {
   if (!localTargetExists) {
     runMutableGit(["switch", "-c", targetBranch, "--track", `origin/${targetBranch}`], dryRun, `Create local ${targetBranch} branch from origin/${targetBranch}`);
   } else {
-    const targetRemoteState = inspectBranchSyncState(targetBranch, remoteTargetExists, false, dryRun);
+    const targetRemoteState = inspectBranchSyncState(targetBranch, { remoteExists: remoteTargetExists });
 
     if (targetRemoteState.diverged) {
       fail(`Promotion stopped because ${targetBranch} has diverged from origin/${targetBranch}.`);
@@ -428,51 +401,6 @@ function sumRemovedLines(numstatOutput) {
     }, 0);
 }
 
-// printDirtySyncSummary kept locally: promote-specific contextLabel parameter.
-function printDirtySyncSummary(statusOutput, contextLabel) {
-  const lines = statusOutput
-    .split(/\r?\n/)
-    .map((value) => value.trimEnd())
-    .filter((value) => value.length > 0);
-
-  if (lines.length === 0) {
-    return;
-  }
-
-  const counts = {
-    modified: 0,
-    added: 0,
-    deleted: 0,
-    renamed: 0,
-    copied: 0,
-    untracked: 0,
-    other: 0
-  };
-
-  for (const line of lines) {
-    counts[classifyStatusLine(line)] += 1;
-  }
-
-  const summaryParts = [
-    ["modified", counts.modified],
-    ["added", counts.added],
-    ["deleted", counts.deleted],
-    ["renamed", counts.renamed],
-    ["copied", counts.copied],
-    ["untracked", counts.untracked],
-    ["other", counts.other]
-  ]
-    .filter(([, count]) => count > 0)
-    .map(([label, count]) => `${count} ${label}`);
-
-  console.log(`Dirty sync summary for ${contextLabel} (${lines.length} file(s)): ${summaryParts.join(", ")}`);
-  console.log("These paths will be staged into the source sync commit:");
-
-  for (const line of lines) {
-    console.log(`- ${line}`);
-  }
-}
-
 function getReviewPromotionGeneratedPaths(_config) {
   // Web template: no review promotion generated paths.
   return new Set();
@@ -501,38 +429,6 @@ function normaliseRepoRelativePath(value) {
   return String(value).trim().replace(/^"|"$/g, "").replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
-function classifyStatusLine(line) {
-  const code = line.slice(0, 2);
-
-  if (code === "??") {
-    return "untracked";
-  }
-
-  const significantCode = code.replace(/\s/g, "");
-
-  if (significantCode.includes("R")) {
-    return "renamed";
-  }
-
-  if (significantCode.includes("C")) {
-    return "copied";
-  }
-
-  if (significantCode.includes("D")) {
-    return "deleted";
-  }
-
-  if (significantCode.includes("A")) {
-    return "added";
-  }
-
-  if (significantCode.includes("M")) {
-    return "modified";
-  }
-
-  return "other";
-}
-
 function createLocalCheckpointSnapshot(config, targetKey, dryRun) {
   const checkpointConfig = config.checkpoint || {};
   const checkpointBranch = `checkpoint/${targetKey}-${createTimestamp()}`;
@@ -559,28 +455,8 @@ function createLocalCheckpointSnapshot(config, targetKey, dryRun) {
   console.log(`Created local checkpoint branch '${checkpointBranch}' at ${checkpointCommit}.`);
 }
 
-function runMutableGit(args, dryRun, description) {
-  if (dryRun) {
-    console.log(`[dry-run] ${description}: git ${args.join(" ")}`);
-    return;
-  }
-
-  const result = spawnSync("git", args, {
-    cwd: repoRoot,
-    stdio: "inherit"
-  });
-
-  if (result.error) {
-    fail(`${description} failed: ${result.error.message}`);
-  }
-
-  if (typeof result.status === "number" && result.status !== 0) {
-    fail(`${description} failed with exit code ${result.status}.`);
-  }
-}
-
-// runGitCapture, runShellCommand — imported from core.
-// runMutableGit kept locally: simplified signature vs core's options-based API.
+// All core functions imported above — no local redefinitions needed.
+// runGitCapture, runShellCommand, runMutableGit imported from core.
 
 function parseArgs(argv) {
   const parsed = {

@@ -14,6 +14,7 @@ const {
   logItem,
   logSection,
   printSummaryTable,
+  resolveBranchModel,
   runMutableGit,
   summariseWorkingTree,
 } = require("./tctbp-core");
@@ -28,9 +29,10 @@ main(loadPolicy(), options);
 
 function main(config, cliOptions) {
   const branchPolicy = config.branch || {};
+  const branchModel = resolveBranchModel(config);
   const defaultBranch =
     branchPolicy.defaultBranch
-    || (config.branchModel && config.branchModel.workingBranch)
+    || branchModel.workingBranch
     || (config.project && config.project.defaultBranch)
     || "development";
   const sourceBranch = getCurrentBranch();

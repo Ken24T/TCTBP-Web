@@ -12,6 +12,7 @@ const gitOps = require("./tctbp-git-ops");
 const profileIO = require("./tctbp-profile-io");
 const output = require("./tctbp-output");
 const gates = require("./tctbp-gates");
+const branchModel = require("./tctbp-branch-model");
 
 module.exports = {
   // Resolved paths (used by runners that need them directly)
@@ -53,6 +54,9 @@ module.exports = {
   resolveTarget: profileIO.resolveTarget,
   stepSemVer: profileIO.stepSemVer,
   updateJsonFileRaw: profileIO.updateJsonFileRaw,
+
+  // Branch model
+  resolveBranchModel: branchModel.resolveBranchModel,
 
   // Output and formatting
   createTimestamp: output.createTimestamp,

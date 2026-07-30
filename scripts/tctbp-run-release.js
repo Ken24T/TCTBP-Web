@@ -31,6 +31,7 @@ const {
   logSection,
   printSummaryTable,
   readVersionSource,
+  resolveBranchModel,
   resolveRepoPath,
   runMutableGit,
   runShipGates,
@@ -199,16 +200,12 @@ async function main() {
   const stopAfterStaging = options.stopAt === "staging";
 
   // Determine branch names from the configured strategy
-  const branchModel = config.branchModel || {};
-  const strategy = branchModel.strategy || "staged";
-  const strategies = branchModel.strategies || {};
-  const active = strategies[strategy] || {};
-
-  const devBranch = active.workingBranch || "development";
-  const stagingBranch = active.stagingBranch || active.reviewBranch || "staging";
-  const prodBranch = active.productionBranch || "main";
-
-  const useReviewAlias = Boolean(active.reviewBranch);
+  const branchModel = resolveBranchModel(config);
+  const strategy = branchModel.strategy;
+  const devBranch = branchModel.workingBranch || "development";
+  const stagingBranch = branchModel.preProductionBranch || "staging";
+  const prodBranch = branchModel.productionBranch;
+  const useReviewAlias = Boolean(branchModel.reviewBranch);
 
   logSection("Release");
   logItem("Version", version);

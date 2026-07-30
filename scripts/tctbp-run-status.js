@@ -21,6 +21,7 @@ const {
   printSummaryTable,
   readVersionSource,
   repoRoot,
+  resolveBranchModel,
   resolveStatusRecommendations,
   summariseWorkingTree
 } = require("./tctbp-core");
@@ -60,14 +61,9 @@ function main(config, cliOptions) {
   }
 
   const currentBranch = getCurrentBranch();
-  const defaultBranch = (config.branchModel && config.branchModel.productionBranch) || (config.project && config.project.defaultBranch) || "main";
-  const branchModel = config.branchModel || {};
-  const workingBranch = branchModel.workingBranch || "development";
-  const stagingBranch = branchModel.stagingBranch || "staging";
-  const isStaged = branchModel.strategy === "staged";
-  const significantBranches = isStaged
-    ? Array.from(new Set([workingBranch, stagingBranch, defaultBranch]))
-    : Array.from(new Set([defaultBranch]));
+  const branchModel = resolveBranchModel(config);
+  const defaultBranch = branchModel.productionBranch;
+  const significantBranches = branchModel.significantBranches;
   const workingTreeSummary = summariseWorkingTree(getWorkingTreeStatus());
   const operationStates = detectGitOperationState();
   const branchStates = significantBranches.map((branchName) => getBranchState(branchName, currentBranch));
@@ -321,8 +317,9 @@ function getBranchRecommendations(branchStates, currentBranch) {
 
 function expandWorkflowRecommendations(tokens) {
   const tokenMap = {
-    abort: "workflow state: an unfinished git operation was detected; run 'abort' to cleanly exit before continuing.",
-    resume: "branch sync: local state is behind or diverged from origin; run 'resume' to recover a safe sync state.",
+    abort: "workflow state: an unfinished git operation was detected; run 'abort' to inspect safe recovery options before continuing.",
+    investigate: "repository state: automatic workflow advice is unsafe; inspect the detached, diverged, or compound dirty/behind state before continuing.",
+    resume: "branch sync: local state is behind origin; run 'resume' to fast-forward safely.",
     checkpoint: "working tree: local changes are present; run 'checkpoint' before promotion/deploy actions.",
     publish: "publication: local branch has unpublished commits; run 'publish' to update origin.",
     ship: "release readiness: main appears ship-ready; run 'ship' only when the production candidate is approved.",

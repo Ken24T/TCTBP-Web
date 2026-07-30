@@ -61,7 +61,7 @@
     "runtimeCwd": ".",
     "commands": {
       "format": null,
-      "test": "node ./scripts/tctbp-run-gate.js test",
+      "test": "npm test",
       "lint": null,
       "build": null,
       "releaseBuild": null

@@ -79,6 +79,7 @@ function createRunnerFixture() {
 
   return {
     repo,
+    remote,
     env: { ...process.env, TCTBP_REPO_ROOT: repo }
   };
 }
@@ -148,6 +149,45 @@ test("status and resume use the staged branch model", () => {
   assert.doesNotMatch(resume.stdout, /\breview\b/);
 });
 
+test("status JSON is pure, schema-versioned, and does not fetch", () => {
+  const fixture = createRunnerFixture();
+  fs.rmSync(fixture.remote, { recursive: true, force: true });
+
+  const result = run(
+    process.execPath,
+    [
+      path.join(projectRoot, "scripts", "tctbp-run-status.js"),
+      "--json",
+      "--no-fetch"
+    ],
+    fixture
+  );
+  const document = JSON.parse(result.stdout);
+
+  assert.equal(document.contract.major, 1);
+  assert.equal(document.observation.fetchPerformed, false);
+  assert.equal(document.observation.branchModel.strategy, "staged");
+  assert.deepEqual(
+    document.observation.branchModel.promotionTargets,
+    ["staging", "production"]
+  );
+  assert.doesNotMatch(result.stdout, /\| Origin \| Local \|/);
+});
+
+test("human status output remains the default", () => {
+  const fixture = createRunnerFixture();
+  const result = run(
+    process.execPath,
+    [
+      path.join(projectRoot, "scripts", "tctbp-run-status.js"),
+      "--no-fetch"
+    ],
+    fixture
+  );
+
+  assert.match(result.stdout, /\| Origin \| Local \| Status \| Action\(s\) \|/);
+});
+
 test("long-lived scaffold creates development, review, and main", () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "tctbp-scaffold-"));
   const target = path.join(base, "adviser-fixture");
@@ -194,8 +234,24 @@ test("long-lived scaffold creates development, review, and main", () => {
     "long-lived-environment-branches"
   );
   assert.equal(profile.branchModel.reviewBranch, "review");
+  assert.equal(profile.schemaVersion, 11);
+  assert.equal(profile.adviserContract.major, 1);
   assert.equal(
     fs.existsSync(path.join(target, "scripts", "tctbp-branch-model.js")),
+    true
+  );
+  assert.equal(
+    fs.existsSync(path.join(target, "scripts", "tctbp-status-model.js")),
+    true
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(
+        target,
+        "schemas",
+        "tctbp-adviser-inspection-v1.schema.json"
+      )
+    ),
     true
   );
 });

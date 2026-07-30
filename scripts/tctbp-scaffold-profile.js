@@ -8,9 +8,12 @@ function generateProfile(answers) {
   const isLongLived = answers.branchStrategy === "long-lived-environment-branches";
   const hasTests = answers.testFramework !== "none";
   const deployTarget = answers.deployTarget.toLowerCase();
+  const contractMetadata = readContractMetadata();
 
   const profile = {
-    schemaVersion: 10,
+    schemaVersion: contractMetadata.schemaVersion,
+    adviserContract: contractMetadata.adviserContract,
+    adviserVocabulary: contractMetadata.adviserVocabulary,
     governance: {
       sourceOfTruth: "TCTBP.json",
       fallbackDocument: "TCTBP Agent.md",
@@ -149,6 +152,21 @@ function generateProfile(answers) {
   const profilePath = path.join(answers.targetPath, ".github", "TCTBP.json");
   fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2) + "\n", "utf8");
   console.log("Generated project profile.");
+}
+
+function readContractMetadata() {
+  const sourceProfile = JSON.parse(
+    fs.readFileSync(
+      path.resolve(__dirname, "..", ".github", "TCTBP.json"),
+      "utf8"
+    )
+  );
+
+  return {
+    schemaVersion: sourceProfile.schemaVersion,
+    adviserContract: sourceProfile.adviserContract,
+    adviserVocabulary: sourceProfile.adviserVocabulary
+  };
 }
 
 function generateDeployTargets(answers) {

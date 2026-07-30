@@ -14,6 +14,8 @@ const RUNNER_FILES = [
   "tctbp-runtime.js",
   "tctbp-core.js",
   "tctbp-branch-model.js",
+  "tctbp-json-output.js",
+  "tctbp-status-model.js",
   "tctbp-git-ops.js",
   "tctbp-profile-io.js",
   "tctbp-output.js",
@@ -52,6 +54,14 @@ const GITHUB_FILES = [
 const PROMPT_FILES = [
   "Install TCTBP Agent Infrastructure Into Another Repository.prompt.md",
   "Scaffold New TCTBP-Web Project.prompt.md",
+];
+
+const CONTRACT_FILES = [
+  "schemas/tctbp-adviser-inspection-v1.schema.json",
+  "contracts/adviser-v1/fixtures/simple-clean.json",
+  "contracts/adviser-v1/fixtures/staged-dirty.json",
+  "contracts/adviser-v1/fixtures/long-lived-diverged.json",
+  "docs/adviser-contract-v1.md"
 ];
 
 const options = parseArgs(process.argv.slice(2));
@@ -398,6 +408,15 @@ function copyTctbpRuntime(targetPath) {
     }
   }
 
+  for (const file of CONTRACT_FILES) {
+    const src = path.join(SCAFFOLD_REPO_ROOT, file);
+    const dst = path.join(targetPath, file);
+    if (fs.existsSync(src)) {
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.copyFileSync(src, dst);
+    }
+  }
+
   console.log("Copied TCTBP-Web runtime surface.");
 }
 
@@ -424,9 +443,12 @@ function generateProfile(answers) {
   const hasTests = answers.testFramework !== "none";
   const hasVite = answers.framework === "vite";
   const deployTarget = answers.deployTarget.toLowerCase();
+  const contractMetadata = readContractMetadata();
 
   const profile = {
-    schemaVersion: 10,
+    schemaVersion: contractMetadata.schemaVersion,
+    adviserContract: contractMetadata.adviserContract,
+    adviserVocabulary: contractMetadata.adviserVocabulary,
     governance: {
       sourceOfTruth: "TCTBP.json",
       fallbackDocument: "TCTBP Agent.md",
@@ -568,6 +590,18 @@ function generateProfile(answers) {
   const profilePath = path.join(answers.targetPath, ".github", "TCTBP.json");
   fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2) + "\n", "utf8");
   console.log("Generated TCTBP.json profile.");
+}
+
+function readContractMetadata() {
+  const sourceProfile = JSON.parse(
+    fs.readFileSync(path.join(GITHUB_DIR, "TCTBP.json"), "utf8")
+  );
+
+  return {
+    schemaVersion: sourceProfile.schemaVersion,
+    adviserContract: sourceProfile.adviserContract,
+    adviserVocabulary: sourceProfile.adviserVocabulary
+  };
 }
 
 function generateDeployTargets(answers) {

@@ -15,6 +15,7 @@ test("resolves the nested simple template strategy", () => {
   });
 
   assert.deepEqual(result.significantBranches, ["main"]);
+  assert.deepEqual(result.promotionTargets, []);
   assert.equal(result.productionBranch, "main");
   assert.equal(result.workingBranch, null);
 });
@@ -31,6 +32,7 @@ test("resolves a flattened staged profile with a custom working branch", () => {
 
   assert.equal(result.workingBranch, "develop");
   assert.equal(result.preProductionBranch, "staging");
+  assert.deepEqual(result.promotionTargets, ["staging", "production"]);
   assert.deepEqual(result.significantBranches, ["develop", "staging", "main"]);
 });
 
@@ -66,6 +68,7 @@ test("resolves long-lived review branches", () => {
   });
 
   assert.equal(result.preProductionBranch, "review");
+  assert.deepEqual(result.promotionTargets, ["review", "production"]);
   assert.deepEqual(result.significantBranches, [
     "development",
     "review",

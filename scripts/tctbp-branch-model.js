@@ -26,6 +26,9 @@ function resolveBranchModel(config = {}) {
   }
 
   const preProductionBranch = stagingBranch || reviewBranch;
+  const promotionTargets = preProductionBranch
+    ? [preProductionBranch, "production"]
+    : [];
   const significantBranches = [
     workingBranch,
     preProductionBranch,
@@ -44,6 +47,7 @@ function resolveBranchModel(config = {}) {
     reviewBranch,
     preProductionBranch,
     productionBranch,
+    promotionTargets,
     significantBranches
   };
 }

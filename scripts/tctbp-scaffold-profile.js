@@ -5,6 +5,7 @@ const path = require("path");
 
 function generateProfile(answers) {
   const isStaged = answers.branchStrategy === "staged";
+  const isLongLived = answers.branchStrategy === "long-lived-environment-branches";
   const hasTests = answers.testFramework !== "none";
   const deployTarget = answers.deployTarget.toLowerCase();
 
@@ -25,20 +26,29 @@ function generateProfile(answers) {
       changelogFormat: "keep-a-changelog",
       locale: "en-US",
     },
-    branchModel: isStaged
-      ? {
-          strategy: "staged",
-          workingBranch: answers.workingBranch,
-          stagingBranch: "staging",
-          productionBranch: "main",
-          promoteEnabled: true,
-          deployStagingEnabled: true,
-        }
+    branchModel: isStaged || isLongLived
+      ? isLongLived
+        ? {
+            strategy: "long-lived-environment-branches",
+            workingBranch: answers.workingBranch,
+            reviewBranch: "review",
+            productionBranch: "main",
+            promoteEnabled: true,
+            deployEnabled: true,
+          }
+        : {
+            strategy: "staged",
+            workingBranch: answers.workingBranch,
+            stagingBranch: "staging",
+            productionBranch: "main",
+            promoteEnabled: true,
+            deployEnabled: true,
+          }
       : {
           strategy: "simple",
           productionBranch: "main",
           promoteEnabled: false,
-          deployStagingEnabled: false,
+          deployEnabled: false,
         },
     profile: {
       runtimeCwd: ".",
@@ -144,10 +154,11 @@ function generateProfile(answers) {
 function generateDeployTargets(answers) {
   const deployTarget = answers.deployTarget.toLowerCase();
   const isStaged = answers.branchStrategy === "staged";
+  const isLongLived = answers.branchStrategy === "long-lived-environment-branches";
 
   const targets = {};
 
-  if (isStaged) {
+  if (isStaged || isLongLived) {
     targets.dev = {
       aliases: ["development"],
       expectedBranch: answers.workingBranch,
@@ -160,9 +171,11 @@ function generateDeployTargets(answers) {
       postDeployValidation: ["Verify dev environment is reachable."],
     };
 
-    targets.staging = {
+    const preProductionKey = isLongLived ? "review" : "staging";
+    const preProductionBranch = isLongLived ? "review" : "staging";
+    targets[preProductionKey] = {
       aliases: [],
-      expectedBranch: "staging",
+      expectedBranch: preProductionBranch,
       requireCleanTreeBeforeDeployAction: true,
       allowCommitBeforeDeploy: false,
       requireExplicitDirtySyncConfirmation: false,

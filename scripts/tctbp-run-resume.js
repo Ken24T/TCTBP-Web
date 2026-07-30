@@ -33,6 +33,7 @@ const {
   logItem,
   logSection,
   printSummaryTable,
+  resolveBranchModel,
   runMutableGit,
   summariseWorkingTree,
 } = require("./tctbp-core");
@@ -80,15 +81,9 @@ function main(config, cliOptions) {
 
   // ── Determine which branches to inspect ───────────────────────────────────
 
-  const defaultBranch =
-    (config.branchModel && config.branchModel.productionBranch) ||
-    (config.project && config.project.defaultBranch) ||
-    "main";
-
-  // Always include the three significant environment branches plus the current
-  // branch, deduped, to ensure the current branch is always evaluated.
+  const branchModel = resolveBranchModel(config);
   const candidates = Array.from(
-    new Set(["development", "review", defaultBranch, currentBranch])
+    new Set([...branchModel.significantBranches, currentBranch])
   );
 
   // ── Evaluate and action each branch ───────────────────────────────────────

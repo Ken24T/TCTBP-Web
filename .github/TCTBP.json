@@ -109,6 +109,84 @@
       }
     }
   },
+  "candidateGuard": {
+    "enabled": true,
+    "defaultRemote": "origin",
+    "requireFullGitObjectIds": true,
+    "comment": "Promotion and release workflows should bind candidates to both commit and tree identities and revalidate them at approval boundaries."
+  },
+  "promotionSafety": {
+    "enabled": true,
+    "inspectMergePreflight": true,
+    "inspectDeletionImpact": true,
+    "mergeDeleteAudit": {
+      "warnThresholdFiles": 5,
+      "warnThresholdLines": 500,
+      "hardStopThresholdFiles": 20,
+      "hardStopThresholdLines": 2000
+    },
+    "comment": "Use read-only merge preflight and deletion impact checks before a mutating promotion merge."
+  },
+  "releaseState": {
+    "enabled": true,
+    "path": ".tctbp-runtime/release-state.json",
+    "kind": "tctbp-release-state",
+    "atomicWrites": true,
+    "journalPermissions": "0600",
+    "stageOrder": [
+      "preflight-gates",
+      "development-deployed",
+      "staging-promoted",
+      "staging-deployed",
+      "production-promoted",
+      "shipped",
+      "production-deployed",
+      "finalized"
+    ],
+    "candidateStages": {
+      "development": {
+        "stage": "preflight-gates",
+        "evidenceKey": "developmentCandidate",
+        "branch": "development"
+      },
+      "staging": {
+        "stage": "staging-promoted",
+        "evidenceKey": "stagingCandidate",
+        "branch": "staging"
+      },
+      "production": {
+        "stage": "production-promoted",
+        "evidenceKey": "productionCandidate",
+        "branch": "main"
+      }
+    },
+    "comment": "Release journals are generic workflow evidence. Project-specific backup and restore stages must be added by downstream profiles rather than assumed by TCTBP-Web."
+  },
+  "runtimeTransaction": {
+    "enabled": true,
+    "entrypoint": null,
+    "requireServiceHooks": true,
+    "preserveFailedCandidate": true,
+    "comment": "Runtime publication is an injectable atomic bundle transaction. Service lifecycle and health verification belong to the consuming project."
+  },
+  "versionStatus": {
+    "environmentToBranch": {
+      "development": "development",
+      "staging": "staging",
+      "production": "main"
+    },
+    "environmentAliases": {
+      "dev": "development",
+      "development": "development",
+      "staging": "staging",
+      "review": "staging",
+      "prod": "production",
+      "production": "production",
+      "main": "production"
+    },
+    "runtimeStatePath": null,
+    "comment": "Version status is branch/profile-driven by default. Downstream runtime projects may configure a runtime state file and target-scoped checks."
+  },
   "activation": {
     "triggers": [
       "ship",

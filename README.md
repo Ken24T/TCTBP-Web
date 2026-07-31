@@ -56,6 +56,17 @@ development ──promote staging──▶ staging ──promote production─�
 - `scripts/` — Deterministic Node.js runners for every workflow
 - `templates/` — Project skeleton templates for the scaffold trigger
 
+## Generic Hardening Primitives
+
+The reusable safety modules in `scripts/` provide small, read-mostly building blocks for staged web releases:
+
+- `tctbp-candidate-guard.js` records and verifies Git commit/tree identities, including local and remote-tracking branch drift.
+- `tctbp-promotion-safety.js` performs read-only merge-tree preflight, deletion-impact parsing, merge-in-progress detection, and failed-merge recovery.
+- `tctbp-release-state.js` and `tctbp-release-resume.js` maintain an atomic release journal and plan evidence checks. Their defaults use `.tctbp-runtime/release-state.json`, `tctbp-release-state`, and development/staging/production stages. Projects may configure `releaseState.path`, `releaseState.kind`, and `releaseState.stageOrder` in `.github/TCTBP.json` (or pass equivalent settings to the module).
+- `tctbp-runtime-transaction.js` stages, snapshots, verifies, activates, and rolls back a runtime bundle. Stop/start verification is supplied by the consuming project, and entrypoint validation is optional/configurable.
+
+These are generic state and safety primitives, not a deployment platform. DDRE backup/restore runners and any other environment-specific recovery assumptions remain project-specific and are intentionally not part of TCTBP-Web.
+
 ## Requirements
 
 - Node.js 18+

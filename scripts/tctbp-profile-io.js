@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const { resolvePolicyPath, resolveRepoRoot } = require("./tctbp-runtime");
 
 const repoRoot = resolveRepoRoot();
@@ -102,6 +103,29 @@ function readVersionSource(config) {
   };
 }
 
+/**
+ * Check whether a patch version has shipped by looking for a corresponding
+ * git tag (e.g. "v1.1.1").  The ship workflow creates the tag, so the tag
+ * is the authoritative signal that a patch has been released.
+ */
+function patchHasShipped(version) {
+  if (!version || version === "unknown" || version === "n/a") {
+    return false;
+  }
+  try {
+    const tag = `v${version}`;
+    const result = spawnSync("git", ["tag", "-l", tag], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    if (result.status !== 0) return false;
+    return result.stdout.trim() === tag;
+  } catch {
+    return false;
+  }
+}
+
 // ── Semver ──────────────────────────────────────────────────────────────────
 
 function parseSemVer(version) {
@@ -182,6 +206,7 @@ module.exports = {
   loadPolicy,
   maybeReadJsonFile,
   parseSemVer,
+  patchHasShipped,
   policyPath,
   readJsonFile,
   readVersionSource,

@@ -4,9 +4,12 @@ const fs = require("fs");
 const { captureBranchSnapshots, printPostTriggerStatusReport } = require("./tctbp-status-report");
 const { resolvePolicyPath, resolveRepoRoot } = require("./tctbp-runtime");
 const {
+  assertSyncedBranchCandidate,
+  captureSyncedBranchCandidate,
   fail,
   getCurrentBranch,
   getHeadCommit,
+  inspectMergePreflight,
   getWorkingTreeStatus,
   gitLocalBranchExists,
   gitRemoteBranchExists,
@@ -161,7 +164,39 @@ async function main(config, targetInfo, cliOptions) {
     purposeLabel: `Publish ${sourceBranch} before promotion`
   });
 
+  const sourceCandidate = cliOptions.dryRun
+    ? null
+    : captureSyncedBranchCandidate({ repoRoot, branch: sourceBranch });
+
   prepareTargetBranch(target, cliOptions.dryRun);
+
+  if (sourceCandidate) {
+    assertSyncedBranchCandidate({
+      repoRoot,
+      branch: sourceCandidate.branch,
+      expectedCommit: sourceCandidate.commit,
+      expectedTree: sourceCandidate.tree,
+      remote: sourceCandidate.remote
+    });
+  } else {
+    console.log("[dry-run] Would verify the source commit and tree again before merging.");
+  }
+
+  const mergePreflight = inspectMergePreflight({
+    repoRoot,
+    targetRef: cliOptions.dryRun
+      ? (gitRemoteBranchExists(targetBranch) ? `refs/remotes/origin/${targetBranch}` : `refs/heads/${targetBranch}`)
+      : "HEAD",
+    sourceRef: sourceBranch
+  });
+
+  if (!mergePreflight.mergeable) {
+    fail(
+      `Promotion stopped because the read-only merge preflight found conflicts: ${mergePreflight.conflictLines.join("; ") || "inspect merge-tree output"}.`
+    );
+  }
+
+  console.log(`Merge preflight candidate tree: ${mergePreflight.treeSha}`);
 
   const safetyTag = createSafetySnapshotTag(config, targetBranch, cliOptions.dryRun);
   const preMergeTargetCommit = cliOptions.dryRun ? `refs/heads/${targetBranch}` : getHeadCommit();

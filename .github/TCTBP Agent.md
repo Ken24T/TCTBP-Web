@@ -289,6 +289,12 @@ Ship is reserved for `main` so version tags remain production release markers. T
 
 Patch bump behaviour is controlled by `versioning.patchEveryShip` and `versioning.patchEveryShipForDocsInfrastructureOnly`. Minor and major bumps are explicit release decisions on `main`.
 
+### Journaled release orchestration
+
+For staged projects, `scripts/tctbp-run-release.js` composes deploy, promote, and ship into a journaled workflow. Each stage records atomic evidence under the configured `releaseState.path`, including the candidate commit and tree. Use `--resume` after an interrupted workflow; resume revalidates the candidate and shipped tag before continuing. The release journal is ignored by Git and must never be treated as a release artefact.
+
+The generic runner does not assume a backup format, service manager, runtime storage layout, or restore rehearsal. Downstream projects must provide those integrations through their own profile and adapters. DDRE-specific backup and restore runners are not part of TCTBP-Web.
+
 ---
 
 ## Promote Workflow

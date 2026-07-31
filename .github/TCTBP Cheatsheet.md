@@ -101,6 +101,16 @@ Purpose: Formal shipped version workflow. Reserved for `main`.
 
 Executable path: `node scripts/tctbp-run-ship.js --no-docs-impact "<reason>" --yes`
 
+### `prepare release` with `--resume`
+
+Purpose: Run or resume the staged deploy → promote → ship pipeline with an atomic release journal and commit/tree candidate revalidation.
+
+Executable paths:
+- `node scripts/tctbp-run-release.js --no-docs-impact "<reason>"`
+- `node scripts/tctbp-run-release.js --resume`
+
+The generic runner does not assume DDRE backup, restore, systemd, or runtime-storage behaviour. Downstream projects supply those integrations separately.
+
 ### `publish` / `publish please`
 
 Purpose: Safely publish the current clean branch to `origin` without release semantics.
@@ -150,7 +160,7 @@ Executable path: `node scripts/tctbp-run-gate.js <test|lint|build>`
 
 Purpose: Report branch/version/tag alignment.
 
-Executable path: `node scripts/tctbp-run-version.js [--strict]`
+Executable path: `node scripts/tctbp-run-version.js [--strict] [--required-environment <development|staging|production>]`
 
 ### `rollback` / `revert last checkpoint`
 

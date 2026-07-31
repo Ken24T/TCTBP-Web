@@ -20,6 +20,10 @@ function main(cliOptions) {
     passthroughArgs.push("--strict");
   }
 
+  if (cliOptions.requiredEnvironment) {
+    passthroughArgs.push("--required-environment", cliOptions.requiredEnvironment);
+  }
+
   const result = spawnSync(process.execPath, [scriptPath, ...passthroughArgs], {
     cwd: process.cwd(),
     stdio: "inherit",
@@ -37,9 +41,12 @@ function parseArgs(argv) {
   const parsed = {
     list: false,
     strict: false,
+    requiredEnvironment: null,
   };
 
-  for (const arg of argv) {
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+
     if (arg === "--list") {
       parsed.list = true;
       continue;
@@ -50,6 +57,16 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === "--required-environment") {
+      const value = argv[index + 1];
+      index += 1;
+      if (!value || value.startsWith("--")) {
+        fail("--required-environment requires a value.");
+      }
+      parsed.requiredEnvironment = value;
+      continue;
+    }
+
     fail(`Unknown option '${arg}'.`);
   }
 
@@ -57,6 +74,6 @@ function parseArgs(argv) {
 }
 
 function printUsage(exitCode) {
-  console.log("Usage: node scripts/tctbp-run-version.js [--strict] [--list]");
+  console.log("Usage: node scripts/tctbp-run-version.js [--strict] [--required-environment <environment>] [--list]");
   process.exit(exitCode);
 }

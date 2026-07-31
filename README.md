@@ -31,6 +31,15 @@ ship please
 handover please
 ```
 
+Machine integrations can consume the versioned, non-fetching Adviser contract:
+
+```bash
+node scripts/tctbp-run-status.js --json --no-fetch
+```
+
+See [Adviser contract v1](docs/adviser-contract-v1.md) for compatibility,
+evidence-boundary, schema, and fixture details.
+
 ## Branch Model
 
 TCTBP-Web itself uses the `"simple"` branch strategy (just `main` — it's a template repo, not a deployed app).

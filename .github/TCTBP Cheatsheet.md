@@ -9,7 +9,7 @@ Use [TCTBP Agent.md](TCTBP%20Agent.md) for the full workflow rules and guard rai
 
 | Trigger family | Primary command path | Mutates repo? |
 |---|---|---|
-| status | `node scripts/tctbp-run-status.js [--suggest]` | No |
+| status | `node scripts/tctbp-run-status.js [--suggest]` or `--json --no-fetch` | No |
 | checkpoint | `node scripts/tctbp-run-checkpoint.js` | Local commit only |
 | publish | `node scripts/tctbp-run-publish.js` | May push current branch |
 | handover | `node scripts/tctbp-run-handover.js` | May checkpoint + publish |
@@ -32,6 +32,7 @@ Use [TCTBP Agent.md](TCTBP%20Agent.md) for the full workflow rules and guard rai
 Quick safety notes:
 
 - Preview-first workflows: `checkpoint --dry-run`, `publish --dry-run`, `handover --dry-run`, `abort` (default), `rollback` (default), `status --suggest`, `scaffold --dry-run`.
+- Machine-readable status is explicitly non-fetching: `node scripts/tctbp-run-status.js --json --no-fetch`.
 - Remote mutation workflows: `publish`, `handover`, `promote staging`, selected deploy targets, and `ship` on `main`.
 - `rollback` always uses `git revert`, never history rewrite.
 - `scaffold` creates a new directory/project outside the current repo.

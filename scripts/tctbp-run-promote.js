@@ -6,6 +6,7 @@ const { resolvePolicyPath, resolveRepoRoot } = require("./tctbp-runtime");
 const {
   assertSyncedBranchCandidate,
   captureSyncedBranchCandidate,
+  createTimestamp,
   fail,
   getCurrentBranch,
   getHeadCommit,
@@ -14,16 +15,19 @@ const {
   gitLocalBranchExists,
   gitRemoteBranchExists,
   gitRemoteTagExists,
+  inspectBranchSyncState,
   loadPolicy,
   logItem,
   logSection,
   printDirtySummary,
   printSummaryTable,
   readVersionSource,
+  resolveBranchModel,
   resolveRepoPath,
   resolveTarget,
   runBuildGate,
   runGitCapture,
+  runMutableGit,
   runShellCommand,
   runVerificationGates,
   stepSemVer,
@@ -618,32 +622,28 @@ function printUsage(exitCode, config = null) {
 }
 
 function getStatusReportBranches(config, extraBranches) {
-  const branchModel = config.branchModel || {};
-
-  return [
-    branchModel.workingBranch,
-    branchModel.reviewBranch,
-    branchModel.productionBranch || (config.project ? config.project.defaultBranch : null),
-    ...(extraBranches || [])
-  ].filter((value, index, array) => typeof value === "string" && value.trim().length > 0 && array.indexOf(value) === index);
+  const branchModel = resolveBranchModel(config);
+  return Array.from(
+    new Set([...branchModel.significantBranches, ...(extraBranches || [])])
+  );
 }
 
 function getPromotionStatusActions(config, targetKey) {
-  const branchModel = config.branchModel || {};
+  const branchModel = resolveBranchModel(config);
   const workingBranch = branchModel.workingBranch || "development";
-  const reviewBranch = branchModel.reviewBranch || "staging";
-  const productionBranch = branchModel.productionBranch || (config.project ? config.project.defaultBranch : "main");
+  const preProductionBranch = branchModel.preProductionBranch || "staging";
+  const productionBranch = branchModel.productionBranch;
   const actions = {};
 
-  if (targetKey === "staging") {
+  if (targetKey !== "production") {
     actions[workingBranch] = "Continue day-to-day work on development.";
-    actions[reviewBranch] = "Promoted candidate is published; deploy review or collect field feedback.";
+    actions[preProductionBranch] = "Promoted candidate is published; deploy or collect field feedback.";
     actions[productionBranch] = "No change to production.";
     return actions;
   }
 
   actions[workingBranch] = "No change to the working branch.";
-  actions[reviewBranch] = "Approved source candidate remains published on review.";
+  actions[preProductionBranch] = "Approved source candidate remains published for review.";
   actions[productionBranch] = "Local production candidate is ready; run ship when approved.";
 
   return actions;

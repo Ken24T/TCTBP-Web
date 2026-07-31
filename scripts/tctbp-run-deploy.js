@@ -23,10 +23,12 @@ const {
   printDirtySummary,
   printSummaryTable,
   readVersionSource,
+  resolveBranchModel,
   resolveRepoPath,
   resolveTarget,
   runBuildGate,
   runGitCapture,
+  runMutableGit,
   runShellCommand,
   runVerificationGates,
   stepSemVer,
@@ -96,7 +98,7 @@ function main(config, targetInfo, cliOptions) {
   runMutableGit(["fetch", "--prune", "origin"], cliOptions.dryRun, "Fetch origin before deploy preflight");
 
   let remoteExists = gitRefExists(remoteRef);
-  const remoteState = inspectBranchSyncState(expectedBranch, { remoteExists, localRef: "HEAD" });
+  let remoteState = inspectBranchSyncState(expectedBranch, { remoteExists, localRef: "HEAD" });
 
   stopIfBehindOrDiverged(remoteState, remoteBranchLabel, "Deploy");
   stopIfUnpublishedOrAhead(target, key, remoteExists, remoteState, remoteBranchLabel);
@@ -235,7 +237,7 @@ function runRuntimePublishStep(config, targetKey, expectedBranch, dryRun) {
 // printDirtySyncSummary replaced with printDirtySummary from core.
 // runMutableGit, classifyStatusLine imported from core.
 
-function stopIfUnpublishedOrAhead(target, key, remoteExists, remoteState, remoteBranchLabel) {
+function findPublishedReleaseTag(tags) {
   for (const tag of tags) {
     if (gitRemoteTagExists(tag)) {
       return tag;
@@ -243,6 +245,23 @@ function stopIfUnpublishedOrAhead(target, key, remoteExists, remoteState, remote
   }
 
   return null;
+}
+
+function stopIfUnpublishedOrAhead(target, key, remoteExists, remoteState, remoteBranchLabel) {
+  if (!remoteExists && !target.allowFirstPublishBeforeDeploy) {
+    fail(`Deploy target '${key}' requires an existing ${remoteBranchLabel}.`);
+  }
+
+  if (remoteState.ahead > 0 && !target.allowPushBeforeDeploy) {
+    fail(`Deploy target '${key}' requires ${remoteBranchLabel} to be current before deployment.`);
+  }
+
+  if (
+    target.requireSyncedBranchBeforeDeployAction &&
+    (!remoteExists || remoteState.ahead > 0)
+  ) {
+    fail(`Deploy target '${key}' requires a clean, already-published ${remoteBranchLabel}.`);
+  }
 }
 
 function createLocalCheckpointSnapshot(config, targetKey, dryRun) {
@@ -269,61 +288,6 @@ function createLocalCheckpointSnapshot(config, targetKey, dryRun) {
 
   runMutableGit(["branch", checkpointBranch, checkpointCommit], false, `Create local checkpoint branch ${checkpointBranch}`);
   console.log(`Created local checkpoint branch '${checkpointBranch}' at ${checkpointCommit}.`);
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function sanitizeBranchName(branchName) {
-  return String(branchName).replace(/[^a-zA-Z0-9._-]/g, "-");
-}
-
-function getStatusReportBranches(config, extraBranches = []) {
-  const branches = new Set(extraBranches);
-  const defaultBranch = (config.branchModel && config.branchModel.productionBranch) || (config.project && config.project.defaultBranch) || "main";
-
-  branches.add(defaultBranch);
-
-  if (config.branchModel && config.branchModel.strategy === "staged") {
-    if (config.branchModel.workingBranch) {
-      branches.add(config.branchModel.workingBranch);
-    }
-
-    if (config.branchModel.stagingBranch) {
-      branches.add(config.branchModel.stagingBranch);
-    }
-  }
-
-  const currentBranch = getCurrentBranch();
-  if (currentBranch !== "HEAD") {
-    branches.add(currentBranch);
-  }
-
-  return Array.from(branches);
-}
-
-function getDeployStatusActions(config, expectedBranch) {
-  const actions = {};
-  actions[expectedBranch] = "Deployed branch.";
-
-  return actions;
-}
-
-function getDeployNextSteps(expectedBranch) {
-  return [
-    `Check the ${expectedBranch} deploy output above.`,
-    `Return to your working branch when ready: git switch ${expectedBranch === "main" ? "development" : expectedBranch}`
-  ];
-}
-
-function logDeployMechanismMessage(key) {
-  console.log(`Deploy target '${key}' completed via the local platform mechanism.`);
-}
-
-function printUsage(exitCode) {
-  console.log("Usage: node scripts/tctbp-run-deploy.js <target> [--dry-run] [--list] [--allow-dirty-sync] [--docs-updated|\"--no-docs-impact\" \"<reason>\"] [--checkpoint-before-dirty-sync] [--commit-message \"<message>\"]");
-  process.exit(exitCode);
 }
 
 function parseArgs(argv) {
@@ -419,25 +383,21 @@ function printUsage(exitCode, config = null) {
 }
 
 function getStatusReportBranches(config, extraBranches) {
-  const branchModel = config.branchModel || {};
-
-  return [
-    branchModel.workingBranch,
-    branchModel.reviewBranch,
-    branchModel.productionBranch || (config.project ? config.project.defaultBranch : null),
-    ...(extraBranches || [])
-  ].filter((value, index, array) => typeof value === "string" && value.trim().length > 0 && array.indexOf(value) === index);
+  const branchModel = resolveBranchModel(config);
+  return Array.from(
+    new Set([...branchModel.significantBranches, ...(extraBranches || [])])
+  );
 }
 
 function getDeployStatusActions(config, expectedBranch) {
-  const branchModel = config.branchModel || {};
+  const branchModel = resolveBranchModel(config);
   const workingBranch = branchModel.workingBranch || "development";
-  const reviewBranch = branchModel.reviewBranch || "staging";
-  const productionBranch = branchModel.productionBranch || (config.project ? config.project.defaultBranch : "main");
+  const preProductionBranch = branchModel.preProductionBranch || "staging";
+  const productionBranch = branchModel.productionBranch;
   const actions = {};
 
   actions[workingBranch] = expectedBranch === workingBranch ? "Development local platform target can pick up origin/development." : "No change to development.";
-  actions[reviewBranch] = expectedBranch === reviewBranch ? "Review candidate is current; confirm the review URL and environment." : "No change to review.";
+  actions[preProductionBranch] = expectedBranch === preProductionBranch ? "Review candidate is current; confirm the review URL and environment." : "No change to review.";
   actions[productionBranch] =
     expectedBranch === productionBranch
       ? "Published shipped main state is the production deploy source; confirm the live environment."

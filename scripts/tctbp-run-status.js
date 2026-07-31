@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Size justification: this runner preserves the legacy human status assembly
+// while coordinating contract-v1 collection; pure JSON modelling and
+// serialisation are split into dedicated modules.
 
 const fs = require("fs");
 const path = require("path");
@@ -21,38 +24,82 @@ const {
   printSummaryTable,
   readVersionSource,
   repoRoot,
+  resolveBranchModel,
   resolveStatusRecommendations,
   summariseWorkingTree
 } = require("./tctbp-core");
+const { writeJsonDocument } = require("./tctbp-json-output");
+const {
+  createStatusDocument,
+  createStatusErrorDocument
+} = require("./tctbp-status-model");
 
 let summaryTablePrinted = false;
 const originalProcessExit = process.exit.bind(process);
+const argv = process.argv.slice(2);
+const jsonRequested = argv.includes("--json");
 
-// Guarantee the status contract: on failures, still emit a 4-column summary table.
-process.exit = (code) => {
-  const numericCode = typeof code === "number" ? code : Number(code) || 0;
-  if (numericCode !== 0 && !summaryTablePrinted) {
-    printSummaryTable([
-      {
-        origin: "n/a",
-        local: "status-runner",
-        status: "Status run failed before report stage",
-        actions: "Review the error above, then rerun: node scripts/tctbp-run-status.js",
-      },
-    ]);
-    summaryTablePrinted = true;
+class StatusRunnerExit extends Error {
+  constructor(code) {
+    super(`Status runner exited with code ${code}.`);
+    this.exitCode = code;
   }
-
-  originalProcessExit(numericCode);
-};
-
-const options = parseArgs(process.argv.slice(2));
-
-if (options.list) {
-  printUsage(0);
 }
 
-main(loadPolicy(), options);
+if (jsonRequested) {
+  process.exit = (code) => {
+    throw new StatusRunnerExit(Number(code) || 0);
+  };
+} else {
+  installHumanExitContract();
+}
+
+run();
+
+function run() {
+  let config = null;
+
+  try {
+    const options = parseArgs(argv);
+
+    if (options.list) {
+      printUsage(0);
+    }
+
+    if (options.json && !options.noFetch) {
+      fail("--json requires --no-fetch so inspection never changes remote-tracking state.");
+    }
+
+    config = loadPolicy();
+    main(config, options);
+  } catch (error) {
+    if (!jsonRequested) {
+      throw error;
+    }
+
+    writeJsonDocument(createStatusErrorDocument(config, error));
+    originalProcessExit(error instanceof StatusRunnerExit ? error.exitCode || 1 : 1);
+  }
+}
+
+function installHumanExitContract() {
+  process.exit = (code) => {
+    const numericCode = typeof code === "number" ? code : Number(code) || 0;
+    if (numericCode !== 0 && !summaryTablePrinted) {
+      printSummaryTable([
+        {
+          origin: "n/a",
+          local: "status-runner",
+          status: "Status run failed before report stage",
+          actions: "Review the error above, then rerun: node scripts/tctbp-run-status.js",
+        },
+      ]);
+      summaryTablePrinted = true;
+    }
+
+    originalProcessExit(numericCode);
+  };
+}
 
 function main(config, cliOptions) {
   if (!cliOptions.noFetch) {
@@ -60,14 +107,9 @@ function main(config, cliOptions) {
   }
 
   const currentBranch = getCurrentBranch();
-  const defaultBranch = (config.branchModel && config.branchModel.productionBranch) || (config.project && config.project.defaultBranch) || "main";
-  const branchModel = config.branchModel || {};
-  const workingBranch = branchModel.workingBranch || "development";
-  const stagingBranch = branchModel.stagingBranch || "staging";
-  const isStaged = branchModel.strategy === "staged";
-  const significantBranches = isStaged
-    ? Array.from(new Set([workingBranch, stagingBranch, defaultBranch]))
-    : Array.from(new Set([defaultBranch]));
+  const branchModel = resolveBranchModel(config);
+  const defaultBranch = branchModel.productionBranch;
+  const significantBranches = branchModel.significantBranches;
   const workingTreeSummary = summariseWorkingTree(getWorkingTreeStatus());
   const operationStates = detectGitOperationState();
   const branchStates = significantBranches.map((branchName) => getBranchState(branchName, currentBranch));
@@ -136,6 +178,30 @@ function main(config, cliOptions) {
     workingTreeSummary,
     currentBranch,
   });
+
+  if (cliOptions.json) {
+    writeJsonDocument(
+      createStatusDocument({
+        config,
+        fetchPerformed: !cliOptions.noFetch,
+        branchModel,
+        currentBranch,
+        currentLocalSha,
+        currentOriginSha,
+        currentRemoteExists,
+        currentSyncState,
+        workingTreeSummary,
+        operationStates,
+        branchStates,
+        localTag,
+        remoteTag,
+        versionSource,
+        handoverContinuationCount,
+        recommendations
+      })
+    );
+    return;
+  }
 
   printSummaryTable([
     {
@@ -250,6 +316,11 @@ function getBranchState(branchName, currentBranch) {
   if (!localExists) {
     return {
       branchName,
+      localExists,
+      remoteExists,
+      localSha,
+      remoteSha,
+      syncState,
       origin: remoteExists ? `origin/${branchName} @ ${remoteSha}` : "n/a",
       local: `${branchName} missing locally`,
       status: `${statusPrefix}: missing locally`,
@@ -260,6 +331,11 @@ function getBranchState(branchName, currentBranch) {
   if (!remoteExists) {
     return {
       branchName,
+      localExists,
+      remoteExists,
+      localSha,
+      remoteSha,
+      syncState,
       origin: "n/a",
       local: `${branchName} @ ${localSha}`,
       status: `${statusPrefix}: unpublished branch`,
@@ -269,6 +345,11 @@ function getBranchState(branchName, currentBranch) {
 
   return {
     branchName,
+    localExists,
+    remoteExists,
+    localSha,
+    remoteSha,
+    syncState,
     origin: `origin/${branchName} @ ${remoteSha}`,
     local: `${branchName} @ ${localSha}`,
     status: `${statusPrefix}: ${formatSyncStatus(syncState, true)}`,
@@ -321,8 +402,9 @@ function getBranchRecommendations(branchStates, currentBranch) {
 
 function expandWorkflowRecommendations(tokens) {
   const tokenMap = {
-    abort: "workflow state: an unfinished git operation was detected; run 'abort' to cleanly exit before continuing.",
-    resume: "branch sync: local state is behind or diverged from origin; run 'resume' to recover a safe sync state.",
+    abort: "workflow state: an unfinished git operation was detected; run 'abort' to inspect safe recovery options before continuing.",
+    investigate: "repository state: automatic workflow advice is unsafe; inspect the detached, diverged, or compound dirty/behind state before continuing.",
+    resume: "branch sync: local state is behind origin; run 'resume' to fast-forward safely.",
     checkpoint: "working tree: local changes are present; run 'checkpoint' before promotion/deploy actions.",
     publish: "publication: local branch has unpublished commits; run 'publish' to update origin.",
     ship: "release readiness: main appears ship-ready; run 'ship' only when the production candidate is approved.",
@@ -442,7 +524,8 @@ function parseArgs(argv) {
     list: false,
     noFetch: false,
     forHandover: false,
-    suggest: false
+    suggest: false,
+    json: false
   };
 
   for (const arg of argv) {
@@ -466,6 +549,11 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === "--json") {
+      parsed.json = true;
+      continue;
+    }
+
     fail(`Unknown option '${arg}'.`);
   }
 
@@ -473,6 +561,6 @@ function parseArgs(argv) {
 }
 
 function printUsage(exitCode) {
-  console.log("Usage: node scripts/tctbp-run-status.js [--no-fetch] [--for-handover] [--suggest] [--list]");
+  console.log("Usage: node scripts/tctbp-run-status.js [--no-fetch] [--json] [--for-handover] [--suggest] [--list]");
   process.exit(exitCode);
 }

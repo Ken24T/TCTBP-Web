@@ -42,6 +42,7 @@ const {
   printSummaryTable,
   readReleaseState,
   readVersionSource,
+  resolveBranchModel,
   resolveCandidate,
   resolveReleaseStatePath,
   resolveRepoPath,
@@ -384,13 +385,12 @@ async function main(cliOptions) {
   }
 
   // Determine branch names from the configured strategy
-  const branchModel = config.branchModel || {};
-  const strategy = branchModel.strategy || "staged";
-  const active = (branchModel.strategies || {})[strategy] || {};
-  const devBranch = active.workingBranch || "development";
-  const stagingBranch = active.stagingBranch || active.reviewBranch || "staging";
-  const prodBranch = active.productionBranch || "main";
-  const useReviewAlias = Boolean(active.reviewBranch);
+  const branchModel = resolveBranchModel(config);
+  const strategy = branchModel.strategy;
+  const devBranch = branchModel.workingBranch || "development";
+  const stagingBranch = branchModel.preProductionBranch || "staging";
+  const prodBranch = branchModel.productionBranch || "main";
+  const useReviewAlias = Boolean(branchModel.reviewBranch);
   const stopAt = cliOptions.stopAt || (cliOptions.resume ? "production" : "production");
   const context = { config, state, statePath, options: { ...cliOptions, docsNoteKind, docsNote, stopAt } };
 

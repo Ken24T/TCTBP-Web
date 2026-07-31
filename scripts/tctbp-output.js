@@ -138,39 +138,45 @@ function printSummaryTable(rows) {
 // ── Status recommendations ──────────────────────────────────────────────────
 
 function resolveStatusRecommendations(input) {
-  const recommendations = [];
-
   if (input.operationStates.length > 0) {
-    recommendations.push("abort");
+    return ["abort"];
   }
 
-  if (input.currentBranch !== "HEAD") {
-    if (input.currentSyncState.diverged || input.currentSyncState.behind > 0) {
-      recommendations.push("resume");
-    }
-
-    if (!input.workingTreeSummary.isClean) {
-      recommendations.push("checkpoint");
-    }
-
-    if (input.currentRemoteExists === false || input.currentSyncState.ahead > 0) {
-      recommendations.push("publish");
-    }
-
-    if (input.currentBranch === input.defaultBranch && input.shipReadiness.ready) {
-      recommendations.push("ship");
-    }
-
-    if (input.enableHandoverSuggestions === true && (!input.workingTreeSummary.isClean || input.currentSyncState.ahead > 0)) {
-      recommendations.push("handover");
-    }
+  if (input.currentBranch === "HEAD" || input.currentSyncState.diverged) {
+    return ["investigate"];
   }
 
-  if (recommendations.length === 0) {
-    recommendations.push("none");
+  if (!input.workingTreeSummary.isClean && input.currentSyncState.behind > 0) {
+    return ["investigate"];
   }
 
-  return [...new Set(recommendations)];
+  const unpublishedOrAhead =
+    input.currentRemoteExists === false || input.currentSyncState.ahead > 0;
+
+  if (
+    input.enableHandoverSuggestions === true &&
+    (!input.workingTreeSummary.isClean || unpublishedOrAhead)
+  ) {
+    return ["handover"];
+  }
+
+  if (!input.workingTreeSummary.isClean) {
+    return ["checkpoint"];
+  }
+
+  if (input.currentSyncState.behind > 0) {
+    return ["resume"];
+  }
+
+  if (unpublishedOrAhead) {
+    return ["publish"];
+  }
+
+  if (input.currentBranch === input.defaultBranch && input.shipReadiness.ready) {
+    return ["ship"];
+  }
+
+  return ["none"];
 }
 
 module.exports = {

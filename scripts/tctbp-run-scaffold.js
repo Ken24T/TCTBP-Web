@@ -13,6 +13,9 @@ const GITHUB_DIR = path.join(SCAFFOLD_REPO_ROOT, ".github");
 const RUNNER_FILES = [
   "tctbp-runtime.js",
   "tctbp-core.js",
+  "tctbp-branch-model.js",
+  "tctbp-json-output.js",
+  "tctbp-status-model.js",
   "tctbp-git-ops.js",
   "tctbp-profile-io.js",
   "tctbp-output.js",
@@ -58,6 +61,14 @@ const GITHUB_FILES = [
 const PROMPT_FILES = [
   "Install TCTBP Agent Infrastructure Into Another Repository.prompt.md",
   "Scaffold New TCTBP-Web Project.prompt.md",
+];
+
+const CONTRACT_FILES = [
+  "schemas/tctbp-adviser-inspection-v1.schema.json",
+  "contracts/adviser-v1/fixtures/simple-clean.json",
+  "contracts/adviser-v1/fixtures/staged-dirty.json",
+  "contracts/adviser-v1/fixtures/long-lived-diverged.json",
+  "docs/adviser-contract-v1.md"
 ];
 
 const options = parseArgs(process.argv.slice(2));
@@ -215,6 +226,7 @@ function createDirectory(targetPath) {
 
 function substitute(template, answers) {
   const isStaged = answers.branchStrategy === "staged";
+  const isLongLived = answers.branchStrategy === "long-lived-environment-branches";
   const hasVitest = answers.testFramework === "vitest";
   const hasJest = answers.testFramework === "jest";
   const hasTests = hasVitest || hasJest;
@@ -403,6 +415,15 @@ function copyTctbpRuntime(targetPath) {
     }
   }
 
+  for (const file of CONTRACT_FILES) {
+    const src = path.join(SCAFFOLD_REPO_ROOT, file);
+    const dst = path.join(targetPath, file);
+    if (fs.existsSync(src)) {
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.copyFileSync(src, dst);
+    }
+  }
+
   console.log("Copied TCTBP-Web runtime surface.");
 }
 
@@ -425,12 +446,16 @@ function copyPrompts(targetPath) {
 
 function generateProfile(answers) {
   const isStaged = answers.branchStrategy === "staged";
+  const isLongLived = answers.branchStrategy === "long-lived-environment-branches";
   const hasTests = answers.testFramework !== "none";
   const hasVite = answers.framework === "vite";
   const deployTarget = answers.deployTarget.toLowerCase();
+  const contractMetadata = readContractMetadata();
 
   const profile = {
-    schemaVersion: 10,
+    schemaVersion: contractMetadata.schemaVersion,
+    adviserContract: contractMetadata.adviserContract,
+    adviserVocabulary: contractMetadata.adviserVocabulary,
     governance: {
       sourceOfTruth: "TCTBP.json",
       fallbackDocument: "TCTBP Agent.md",
@@ -446,7 +471,7 @@ function generateProfile(answers) {
       changelogFormat: "keep-a-changelog",
       locale: "en-US",
     },
-    branchModel: isStaged
+    branchModel: isStaged || isLongLived
       ? (isLongLived
         ? {
             strategy: "long-lived-environment-branches",
@@ -574,6 +599,18 @@ function generateProfile(answers) {
   console.log("Generated TCTBP.json profile.");
 }
 
+function readContractMetadata() {
+  const sourceProfile = JSON.parse(
+    fs.readFileSync(path.join(GITHUB_DIR, "TCTBP.json"), "utf8")
+  );
+
+  return {
+    schemaVersion: sourceProfile.schemaVersion,
+    adviserContract: sourceProfile.adviserContract,
+    adviserVocabulary: sourceProfile.adviserVocabulary
+  };
+}
+
 function generateDeployTargets(answers) {
   const target = answers.deployTarget.toLowerCase();
   const baseTargets = {
@@ -646,9 +683,17 @@ function createBranchStructure(answers) {
     runIn(answers.targetPath, "git", ["branch", "staging"]);
     runIn(answers.targetPath, "git", ["checkout", "-b", answers.workingBranch]);
     console.log(`Created branch structure: main, staging, ${answers.workingBranch} (current).`);
-  } else {
-    console.log("Simple strategy: staying on main.");
+    return;
   }
+
+  if (answers.branchStrategy === "long-lived-environment-branches") {
+    runIn(answers.targetPath, "git", ["branch", "review"]);
+    runIn(answers.targetPath, "git", ["checkout", "-b", answers.workingBranch]);
+    console.log(`Created branch structure: main, review, ${answers.workingBranch} (current).`);
+    return;
+  }
+
+  console.log("Simple strategy: staying on main.");
 }
 
 // ── Dependency installation ─────────────────────────────────────────────────
@@ -694,9 +739,12 @@ async function setupGitRemote(answers, cliOptions) {
     return;
   }
 
-  const branchNames = answers.branchStrategy === "staged"
-    ? [answers.workingBranch, "staging", "main"]
-    : ["main"];
+  const branchNames =
+    answers.branchStrategy === "staged"
+      ? [answers.workingBranch, "staging", "main"]
+      : answers.branchStrategy === "long-lived-environment-branches"
+        ? [answers.workingBranch, "review", "main"]
+        : ["main"];
 
   if (cliOptions.remote) {
     setRemote(answers.targetPath, cliOptions.remote, branchNames);
@@ -789,7 +837,7 @@ function printSummary(answers, cliOptions) {
   logSection("Scaffold Complete");
   console.log(`Project: ${answers.projectName}`);
   console.log(`Location: ${answers.targetPath}`);
-  console.log(`Branch: ${answers.branchStrategy === "staged" ? answers.workingBranch : "main"} (current)`);
+  console.log(`Branch: ${answers.branchStrategy === "simple" ? "main" : answers.workingBranch} (current)`);
   console.log(`Framework: ${answers.framework === "vite" ? "Vite + React + TypeScript" : "none"}`);
   console.log(`Deploy: ${answers.deployTarget}`);
   console.log(`Tests: ${answers.testFramework}`);
@@ -813,6 +861,8 @@ function printSummary(answers, cliOptions) {
   console.log("When you're ready:");
   if (answers.branchStrategy === "staged") {
     console.log("  code, checkpoint, publish on development → promote staging → promote production → ship");
+  } else if (answers.branchStrategy === "long-lived-environment-branches") {
+    console.log("  code, checkpoint, publish on development → promote review → promote production → ship");
   }
   console.log("  Update TCTBP.json commands when you add lint/format scripts.");
 

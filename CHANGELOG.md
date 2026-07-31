@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Removed shadowed duplicate top-level sections from the canonical TCTBP policy and added regression coverage so policy definitions remain unambiguous.
+
 ## [0.2.0] - 2026-07-30
 
 ### Added

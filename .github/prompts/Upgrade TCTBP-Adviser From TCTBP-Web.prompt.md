@@ -18,20 +18,22 @@ The canonical source is TCTBP-Web. DDRE Intranet is a production proving ground 
 ## Fixed boundaries
 
 - **Source repository:** the current TCTBP-Web repository.
+- **Default source ref:** `main`; use an explicitly supplied source ref instead when provided.
+- **Source revision:** resolve the selected source ref to the full 40-character commit SHA during preflight. Never rely on a hard-coded or stale SHA. Record the selected ref and resolved SHA before copying anything.
 - **Default target:** `/home/ken/Documents/development/repos/TCTBP-Adviser` when no target is supplied.
-- **Current known canonical source ref:** `3a9723b` (`main`). Always verify `main` and record the exact source SHA actually used before copying anything.
 - **Target state:** existing repository already using the TCTBP-Web runtime.
-- **Target branch:** use a dedicated upgrade branch in TCTBP-Adviser; do not work directly on its `main` or `development` branch unless the user explicitly requests that.
+- **Target branch:** use a dedicated upgrade branch in TCTBP-Adviser; do not work directly on its `main` or `development` branch unless the user explicitly requests that. If no branch is supplied, create `upgrade/tctbp-web-<short-source-sha>` from the verified current target branch.
+- **Application-level updates:** include the Adviser inspection/reference/recommendation/intent/UI updates by default; skip Phase 2 only when the user explicitly requests a runtime-only reconciliation.
 
 ## Required preflight
 
 1. Read the source and target repository status, branch, remotes, and current HEADs.
-2. Confirm TCTBP-Web `main` is clean and in sync with `origin/main`.
+2. Confirm the source working tree is clean. When the selected ref is `main`, confirm TCTBP-Web `main` is in sync with `origin/main`; otherwise resolve and verify the explicitly selected ref without changing the source repository.
 3. Confirm TCTBP-Adviser is clean and in sync before creating the upgrade branch.
-4. Read the source `.github/TCTBP.json`, `.github/TCTBP Agent.md`, `.github/TCTBP Cheatsheet.md`, scaffold runner, reconciliation prompt, and managed runtime list.
+4. Read the source `.github/TCTBP.json`, `.github/TCTBP Agent.md`, `.github/TCTBP Cheatsheet.md`, reconciliation prompt, and scaffold runner. Treat the scaffold runner's `RUNNER_FILES`, `GITHUB_FILES`, and `CONTRACT_FILES` arrays as the authoritative managed runtime inventory.
 5. Read the target `.github/TCTBP.json`, `.github/TCTBP Agent.md`, `.github/copilot-instructions.md`, `.tctbp/source.json`, `package.json`, and current Adviser architecture documentation.
-6. Capture a read-only inventory of source-managed files that differ between the two repositories.
-7. Stop and ask if either repository has uncommitted changes, an active Git operation, a detached HEAD, or a diverged branch.
+6. Capture a read-only inventory of source-managed files that differ between the two repositories, including missing files, target modifications, and source-only files. If the target metadata supports presence patterns but not content hashes, report content comparison as unavailable rather than claiming the files match.
+7. Stop and ask if either repository has uncommitted changes, an active Git operation, a detached HEAD, or a diverged branch. The only preparation exception is an explicitly approved prompt-only correction in TCTBP-Web; its runtime and policy files must remain clean and the prompt correction must not be copied into the target runtime surface.
 
 ## Phase 1 — Reconcile TCTBP infrastructure
 
@@ -64,7 +66,7 @@ Update the target policy and documentation carefully so that generic hardening s
 
 Use the current TCTBP-Web policy as the structural source, but do not leave TCTBP-Web template values or placeholders in the target.
 
-Update `.tctbp/source.json` or the equivalent managed-surface metadata to record the exact source repository, source ref, source revision, and managed files.
+Update `.tctbp/source.json` or the equivalent managed-surface metadata to record the exact source repository, selected source ref, full resolved source revision, source version, and authoritative managed files or patterns. If content hashes are not available, preserve an explicit uncertainty that content comparison is unavailable.
 
 Do not copy DDRE-specific code or assumptions, including:
 
@@ -106,7 +108,7 @@ Do not assume that a journal, runtime receipt, or deployment state exists merely
 
 Keep DDRE-specific restore rehearsal and production backup evidence out of the generic Adviser contract unless it is introduced through a clearly named optional capability or downstream provider extension.
 
-Update the pinned TCTBP reference revision from the old value to the exact TCTBP-Web source ref used for this upgrade. Keep the Adviser contract backward-compatible where possible and use additive fields/capabilities rather than breaking existing contract consumers.
+Update every pinned TCTBP reference from the old value to the full resolved TCTBP-Web source revision used for this upgrade, including source metadata, reference catalogue code, fixtures, tests, and architecture documentation. Define any new observation fields and capability identifiers as additive contract changes, bump the contract minor version when the contract changes, and distinguish configured, present, absent, malformed, and unobserved evidence without treating missing optional hardening evidence as unsafe.
 
 Because DDRE currently does not advertise Adviser contract metadata, do not modify DDRE as part of this task. Adviser should either:
 
@@ -129,6 +131,8 @@ Do not:
 
 Intent plans may display TCTBP triggers, but they must remain non-executing plans.
 
+The upgrade operator may run only the fixed verification commands listed below. This does not permit the Adviser service to execute commands, scripts, hooks, package tasks, or `TCTBP.json` command strings read from an inspected repository.
+
 ## Verification
 
 Run in TCTBP-Adviser after reconciliation and application updates:
@@ -137,17 +141,18 @@ Run in TCTBP-Adviser after reconciliation and application updates:
 npm test
 npm run typecheck
 npm run build
+node scripts/tctbp-run-status.js --json --no-fetch
 ```
 
 Also verify:
 
 - the TCTBP-Adviser contract fixtures pass;
 - the reference catalogue source revision matches the selected TCTBP-Web ref;
-- the managed TCTBP surface is complete;
+- the managed TCTBP surface is complete, with content comparison reported as unavailable when no hashes exist;
 - the Adviser API remains local-only and read-only;
-- no target repository command strings are executed;
+- no Adviser service path executes target repository command strings;
 - DDRE-specific backup/restore files were not copied;
-- the target working tree is clean after the approved checkpoint;
+- the target working tree is clean only after an explicitly approved checkpoint; otherwise report the expected uncommitted changes and do not commit;
 - the source and target branch/ref status is reported before any publish.
 
 ## Final report

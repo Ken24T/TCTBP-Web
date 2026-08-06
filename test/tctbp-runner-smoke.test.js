@@ -125,6 +125,25 @@ test("promote and deploy dry-run entry paths load their dependencies", () => {
   );
 });
 
+test("hotfix start and finish dry-run paths load their dependencies", () => {
+  const fixture = createRunnerFixture();
+
+  run("git", ["switch", "main"], { cwd: fixture.repo });
+  run("git", ["switch", "-c", "hotfix/smoke-test"], { cwd: fixture.repo });
+
+  run(
+    process.execPath,
+    [
+      path.join(projectRoot, "scripts", "tctbp-run-hotfix.js"),
+      "finish",
+      "--dry-run",
+      "--no-docs-impact",
+      "runner smoke test"
+    ],
+    fixture
+  );
+});
+
 test("status and resume use the staged branch model", () => {
   const fixture = createRunnerFixture();
   const status = run(

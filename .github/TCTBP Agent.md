@@ -2,11 +2,11 @@
 
 ## Purpose
 
-This agent governs **milestone, checkpointing, shipping, sync, promotion, deployment, and scaffold actions** for repositories that adopt the TCTBP-Web workflow. It exists to safely execute the **TCTBP workflow** with strong guard rails, auditability, human approval at irreversible steps, and deterministic Node.js runners for every workflow.
+This agent governs **milestone, checkpointing, shipping, hotfix, sync, promotion, deployment, and scaffold actions** for repositories that adopt the TCTBP-Web workflow. It exists to safely execute the **TCTBP workflow** with strong guard rails, auditability, human approval at irreversible steps, and deterministic Node.js runners for every workflow.
 
 Primary objective: **no code is ever lost** while keeping local and remote repositories in a validated, recoverable state.
 
-This agent is **not** for exploratory coding or refactoring. It is activated only when the user signals a configured TCTBP trigger (for example `ship`, `checkpoint`, `handover`, `resume`, `promote staging`, `promote review`, `deploy dev`, `run tests`, `ticket create`, `version status`, `rollback`, `release`, or `scaffold`).
+This agent is **not** for exploratory coding or refactoring. It is activated only when the user signals a configured TCTBP trigger (for example `ship`, `checkpoint`, `handover`, `resume`, `promote staging`, `promote review`, `hotfix`, `deploy dev`, `run tests`, `ticket create`, `version status`, `rollback`, `release`, or `scaffold`).
 
 Quick reference: see [TCTBP Cheatsheet.md](TCTBP%20Cheatsheet.md) for the short operator view of triggers, gates, and repo-specific expectations.
 
@@ -312,6 +312,25 @@ Executable path: `node scripts/tctbp-run-promote.js <staging|production> --no-do
 - Verifies staging, creates a safety snapshot of main, merges staging into main, runs the deletion audit, verifies main. Does NOT push main — `ship` and `deploy production` are separate explicit workflows. Stays on main.
 
 Promotion is a merge workflow, not a deploy workflow. When `branchModel.strategy` is `"simple"`, promote is disabled.
+
+---
+
+## Hotfix Workflow
+
+Trigger: `hotfix` / `hotfix start` / `hotfix finish` / `emergency fix`
+
+Purpose: emergency-lane production fix that bypasses the normal promote-review/promote-production chain. Creates a `hotfix/*` branch from `main`, merges it into `main`, ships a patch release, and backports the new `main` into the pre-production and working branches.
+
+Executable paths:
+- `node scripts/tctbp-run-hotfix.js start <name>` — create `hotfix/<name>` from the production branch
+- `node scripts/tctbp-run-hotfix.js finish --no-docs-impact "<reason>"` — merge, ship, and backport
+
+Notes:
+- `start` requires the current branch to be the production branch with a clean working tree.
+- `finish` requires the current branch to be a `hotfix/*` branch with a clean working tree.
+- `finish` runs verification gates before merging and ships with `--bump patch` by default.
+- `finish` pushes `main` (via `ship`), then backports to the pre-production and working branches and pushes those.
+- After `finish`, the local hotfix branch is deleted and the user is returned to the working branch.
 
 ---
 

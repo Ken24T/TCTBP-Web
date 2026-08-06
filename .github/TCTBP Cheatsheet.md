@@ -23,6 +23,7 @@ Use [TCTBP Agent.md](TCTBP%20Agent.md) for the full workflow rules and guard rai
 | workflow | `node scripts/tctbp-run-workflow.js <deploy\|promote\|branch> ...` | Routes to sub-runners |
 | branch | `node scripts/tctbp-run-branch.js [new-branch-name]` | Local merge/branch ops |
 | ship | `node scripts/tctbp-run-ship.js --no-docs-impact "<reason>" --yes` | Commit/tag/push on `main` |
+| hotfix | `node scripts/tctbp-run-hotfix.js {start \| finish}` | Creates hotfix branch; merges, ships, and backports |
 | abort | `node scripts/tctbp-run-abort.js --dry-run` | Preview by default |
 | gate | `node scripts/tctbp-run-gate.js <test\|lint\|build>` | No (unless gate command writes) |
 | version | `node scripts/tctbp-run-version.js [--strict]` | No |
@@ -101,6 +102,18 @@ Notes:
 Purpose: Formal shipped version workflow. Reserved for `main`.
 
 Executable path: `node scripts/tctbp-run-ship.js --no-docs-impact "<reason>" --yes`
+
+### `hotfix` / `hotfix start` / `hotfix finish` / `emergency fix`
+
+Purpose: Emergency-lane production fix that bypasses the normal promote-review-promote-production flow.
+
+Executable paths:
+- `node scripts/tctbp-run-hotfix.js start <name>` — create `hotfix/<name>` from `main`
+- `node scripts/tctbp-run-hotfix.js finish --no-docs-impact "<reason>"` — merge hotfix to `main`, ship, and backport to pre-production and working branches
+
+Notes:
+- `finish` always ships with `--bump patch` unless another bump is supplied.
+- `finish` pushes the shipped `main` branch, then backports it to the configured pre-production and working branches and pushes those.
 
 ### `prepare release` with `--resume`
 

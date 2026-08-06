@@ -47,7 +47,8 @@
       "branch",
       "promote",
       "deploy",
-      "ship"
+      "ship",
+      "hotfix"
     ]
   },
   "governance": {
@@ -293,7 +294,15 @@
       "scaffold web",
       "scaffold web please",
       "new project",
-      "create project"
+      "create project",
+      "hotfix",
+      "hotfix please",
+      "hotfix start",
+      "hotfix start please",
+      "hotfix finish",
+      "hotfix finish please",
+      "emergency fix",
+      "emergency fix please"
     ],
     "caseInsensitive": true,
     "branchCommand": {

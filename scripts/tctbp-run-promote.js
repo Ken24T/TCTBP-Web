@@ -334,7 +334,7 @@ async function main(config, targetInfo, cliOptions) {
         value: safetyTag
       }
     ],
-    nextSteps: getPromotionNextSteps(key)
+    nextSteps: getPromotionNextSteps(key, config)
   });
 }
 
@@ -708,17 +708,22 @@ function getPromotionStatusActions(config, targetKey) {
   return actions;
 }
 
-function getPromotionNextSteps(targetKey) {
-  if (targetKey === "staging") {
+function getPromotionNextSteps(targetKey, config) {
+  const branchModel = resolveBranchModel(config);
+  const workingBranch = branchModel.workingBranch || "development";
+  const preProductionBranch = branchModel.preProductionBranch || "staging";
+  const productionBranch = branchModel.productionBranch;
+
+  if (targetKey === "production") {
     return [
-      "Run deploy review when you want the review local platform target to pick up origin/review.",
-      "Continue development work from the development branch."
+      `Run ship from ${productionBranch} when the promoted production candidate is approved.`,
+      `Do not push ${productionBranch} directly outside the ship workflow.`
     ];
   }
 
   return [
-    "Run ship from local main when the promoted production candidate is approved.",
-    "Do not push main directly outside the ship workflow."
+    `Run deploy ${preProductionBranch} when you want the ${preProductionBranch} local platform target to pick up origin/${preProductionBranch}.`,
+    `Continue development work from the ${workingBranch} branch.`
   ];
 }
 

@@ -5,7 +5,12 @@ All notable changes to the TCTBP-Web template will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-08-10
+
+### Added
+- Multi-format version files: ship (and release) can now read and bump versions in JSON (`package.json`), TOML (`Cargo.toml`), and plain-text (`VERSION`) files, declared via `project.versionFiles` and `profile.versioning.sourceOfTruth`.
+- Ship gates are now profile-driven (`profile.commands`), with a `package.json` fallback for legacy web projects — so non-npm stacks (e.g. Cargo) can gate a release without a `package.json`.
+- `version-files.multi-format-v1` advertised under `adviserContract.capabilities`.
 
 ### Fixed
 - Removed shadowed duplicate top-level sections from the canonical TCTBP policy and added regression coverage so policy definitions remain unambiguous.

@@ -93,7 +93,8 @@ test("policy advertises contract v1 capabilities and schema", () => {
     capabilities: [
       "inspection.local-v1",
       "workflow-catalogue.core-v1",
-      "reason-codes.core-v1"
+      "reason-codes.core-v1",
+      "version-files.multi-format-v1"
     ],
     schema: "schemas/tctbp-adviser-inspection-v1.schema.json",
     compatibility:

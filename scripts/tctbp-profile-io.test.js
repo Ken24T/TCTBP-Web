@@ -9,8 +9,10 @@ const {
   detectVersionFileFormat,
   parseTomlPackageName,
   parseTomlPackageVersion,
+  parseTomlWorkspaceMembers,
   readVersionFile,
   renderCargoLockPackageVersion,
+  renderCargoLockVersions,
   renderTomlPackageVersion,
   syncCargoLockVersion,
   writeVersionFile
@@ -205,6 +207,110 @@ test("syncCargoLockVersion updates the sibling Cargo.lock in place", () => {
     assert.ok(synced.includes('name = "rust-calendar"'));
     assert.ok(synced.includes('version = "0.3.0"'));
     assert.ok(synced.includes('version = "1.0.1"'));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── Rust workspace versioning (workspace-inherited member versions) ────────
+
+const WORKSPACE_CARGO_TOML = [
+  "[workspace]",
+  'members = ["crates/alpha", "crates/beta"]',
+  'resolver = "2"',
+  "",
+  "[workspace.package]",
+  'edition = "2024"',
+  'version = "0.4.4"',
+  "",
+  "[workspace.dependencies]",
+  'anyhow = "1.0"',
+  ""
+].join("\n");
+
+const MEMBER_ALPHA_TOML = ['[package]', 'name = "extractor-alpha"', 'version.workspace = true', ""].join("\n");
+const MEMBER_BETA_TOML = ['[package]', 'name = "extractor-beta"', 'version.workspace = true', ""].join("\n");
+
+const WORKSPACE_LOCK = [
+  '[[package]]',
+  'name = "extractor-alpha"',
+  'version = "0.4.4"',
+  'dependencies = [',
+  ' "anyhow",',
+  ']',
+  "",
+  '[[package]]',
+  'name = "extractor-beta"',
+  'version = "0.4.4"',
+  'dependencies = [',
+  ' "anyhow",',
+  ']',
+  "",
+  '[[package]]',
+  'name = "anyhow"',
+  'version = "1.0.1"',
+  'source = "registry+https://github.com/rust-lang/crates.io-index"',
+  ""
+].join("\n");
+
+test("detectVersionFileFormat recognises a workspace root Cargo.toml", () => {
+  assert.equal(detectVersionFileFormat(WORKSPACE_CARGO_TOML), "toml");
+});
+
+test("parseTomlPackageVersion falls back to [workspace.package]", () => {
+  assert.equal(parseTomlPackageVersion(WORKSPACE_CARGO_TOML), "0.4.4");
+});
+
+test("parseTomlWorkspaceMembers reads the member paths", () => {
+  assert.deepEqual(parseTomlWorkspaceMembers(WORKSPACE_CARGO_TOML), ["crates/alpha", "crates/beta"]);
+  assert.deepEqual(parseTomlWorkspaceMembers('[package]\nname = "x"\n'), []);
+});
+
+test("renderTomlPackageVersion replaces the [workspace.package] version", () => {
+  const rendered = renderTomlPackageVersion(WORKSPACE_CARGO_TOML, "0.5.0");
+  assert.ok(rendered);
+  assert.equal(rendered, WORKSPACE_CARGO_TOML.replace('version = "0.4.4"', 'version = "0.5.0"'));
+});
+
+test("readVersionFile reads a workspace root Cargo.toml version", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tctbp-ws-read-"));
+  try {
+    const file = path.join(root, "Cargo.toml");
+    fs.writeFileSync(file, WORKSPACE_CARGO_TOML, "utf8");
+    assert.deepEqual(readVersionFile(file), { ok: true, format: "toml", version: "0.4.4" });
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("renderCargoLockVersions updates every member [[package]] entry", () => {
+  const rendered = renderCargoLockVersions(WORKSPACE_LOCK, ["extractor-alpha", "extractor-beta"], "0.5.0");
+  assert.ok(rendered);
+  assert.ok(rendered.includes('name = "extractor-alpha"\nversion = "0.5.0"'));
+  assert.ok(rendered.includes('name = "extractor-beta"\nversion = "0.5.0"'));
+  assert.ok(rendered.includes('name = "anyhow"'));
+  assert.ok(rendered.includes('version = "1.0.1"'));
+  assert.equal(renderCargoLockVersions(WORKSPACE_LOCK, ["missing"], "0.5.0"), null);
+});
+
+test("syncCargoLockVersion syncs all workspace members in a lockfile", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tctbp-ws-sync-"));
+  try {
+    const crates = path.join(root, "crates");
+    fs.mkdirSync(path.join(crates, "alpha"), { recursive: true });
+    fs.mkdirSync(path.join(crates, "beta"), { recursive: true });
+    fs.writeFileSync(path.join(root, "Cargo.toml"), WORKSPACE_CARGO_TOML, "utf8");
+    fs.writeFileSync(path.join(crates, "alpha", "Cargo.toml"), MEMBER_ALPHA_TOML, "utf8");
+    fs.writeFileSync(path.join(crates, "beta", "Cargo.toml"), MEMBER_BETA_TOML, "utf8");
+    fs.writeFileSync(path.join(root, "Cargo.lock"), WORKSPACE_LOCK, "utf8");
+
+    const result = syncCargoLockVersion(path.join(root, "Cargo.toml"), "0.5.0");
+    assert.equal(result.ok, true);
+    assert.equal(result.updated, true);
+    const synced = fs.readFileSync(path.join(root, "Cargo.lock"), "utf8");
+    assert.ok(synced.includes('name = "extractor-alpha"\nversion = "0.5.0"'));
+    assert.ok(synced.includes('name = "extractor-beta"\nversion = "0.5.0"'));
+    assert.ok(synced.includes('name = "anyhow"\nversion = "1.0.1"'));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

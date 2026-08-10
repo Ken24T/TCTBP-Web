@@ -11,6 +11,7 @@ const SCRIPTS_DIR = path.join(SCAFFOLD_REPO_ROOT, "scripts");
 const GITHUB_DIR = path.join(SCAFFOLD_REPO_ROOT, ".github");
 
 const RUNNER_FILES = [
+  "package.json",
   "tctbp-runtime.js",
   "tctbp-core.js",
   "tctbp-branch-model.js",

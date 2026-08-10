@@ -6,6 +6,8 @@ const os = require("os");
 const path = require("path");
 const test = require("node:test");
 const {
+  buildDefaultPromoteTargets,
+  buildEffectivePromoteTargets,
   detectVersionFileFormat,
   parseTomlPackageName,
   parseTomlPackageVersion,
@@ -14,6 +16,7 @@ const {
   renderCargoLockPackageVersion,
   renderCargoLockVersions,
   renderTomlPackageVersion,
+  resolveTarget,
   syncCargoLockVersion,
   writeVersionFile
 } = require("./tctbp-profile-io");
@@ -314,4 +317,99 @@ test("syncCargoLockVersion syncs all workspace members in a lockfile", () => {
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+// ── Promotion target resolution ─────────────────────────────────────────────
+
+const LONG_LIVED_CONFIG = {
+  project: { defaultBranch: "main" },
+  branchModel: {
+    strategy: "long-lived-environment-branches",
+    workingBranch: "development",
+    reviewBranch: "review",
+    productionBranch: "main"
+  },
+  promote: {
+    targets: {
+      staging: {
+        aliases: [],
+        sourceBranch: "development",
+        targetBranch: "staging"
+      },
+      production: {
+        aliases: ["prod"],
+        sourceBranch: "staging",
+        targetBranch: "main"
+      }
+    }
+  }
+};
+
+const STAGED_CONFIG = {
+  project: { defaultBranch: "main" },
+  branchModel: {
+    strategy: "staged",
+    workingBranch: "development",
+    stagingBranch: "staging",
+    productionBranch: "main"
+  },
+  promote: {
+    targets: {
+      staging: {
+        aliases: [],
+        sourceBranch: "development",
+        targetBranch: "staging"
+      },
+      production: {
+        aliases: ["prod"],
+        sourceBranch: "staging",
+        targetBranch: "main"
+      }
+    }
+  }
+};
+
+test("buildDefaultPromoteTargets derives branch-model-aware targets", () => {
+  const longLived = buildDefaultPromoteTargets(LONG_LIVED_CONFIG);
+  assert.deepEqual(Object.keys(longLived).sort(), ["production", "review"]);
+  assert.equal(longLived.review.sourceBranch, "development");
+  assert.equal(longLived.review.targetBranch, "review");
+  assert.equal(longLived.production.sourceBranch, "review");
+  assert.equal(longLived.production.targetBranch, "main");
+
+  const staged = buildDefaultPromoteTargets(STAGED_CONFIG);
+  assert.deepEqual(Object.keys(staged).sort(), ["production", "staging"]);
+  assert.equal(staged.staging.sourceBranch, "development");
+  assert.equal(staged.staging.targetBranch, "staging");
+  assert.equal(staged.production.sourceBranch, "staging");
+});
+
+test("buildEffectivePromoteTargets drops stale staging targets in a long-lived repo", () => {
+  const targets = buildEffectivePromoteTargets(LONG_LIVED_CONFIG);
+
+  // Stale `staging` config target must not shadow the branch-model `review`
+  // target, and the stale `production.sourceBranch: staging` must be replaced
+  // by the branch-model default (review → main).
+  assert.deepEqual(Object.keys(targets).sort(), ["production", "review"]);
+  assert.equal(resolveTarget(targets, "review").target.targetBranch, "review");
+  assert.equal(resolveTarget(targets, "production").target.sourceBranch, "review");
+  assert.equal(resolveTarget(targets, "production").target.targetBranch, "main");
+  assert.equal(resolveTarget(targets, "staging"), null);
+  // Aliases from the dropped config target are preserved onto the default.
+  assert.deepEqual(resolveTarget(targets, "prod").target.aliases, ["prod"]);
+});
+
+test("buildEffectivePromoteTargets preserves valid staged config targets", () => {
+  const targets = buildEffectivePromoteTargets(STAGED_CONFIG);
+  assert.deepEqual(Object.keys(targets).sort(), ["production", "staging"]);
+  assert.equal(resolveTarget(targets, "staging").target.targetBranch, "staging");
+  assert.equal(resolveTarget(targets, "production").target.sourceBranch, "staging");
+  assert.equal(resolveTarget(targets, "prod").target.targetBranch, "main");
+});
+
+test("buildEffectivePromoteTargets falls back to defaults without config targets", () => {
+  const { promote, ...rest } = LONG_LIVED_CONFIG;
+  const targets = buildEffectivePromoteTargets(rest);
+  assert.deepEqual(Object.keys(targets).sort(), ["production", "review"]);
+  assert.equal(resolveTarget(targets, "review").target.targetBranch, "review");
 });

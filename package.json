@@ -1,6 +1,6 @@
 {
   "name": "tctbp-web",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "description": "Canonical template repository for web/browser-based projects using the TCTBP workflow",
   "scripts": {

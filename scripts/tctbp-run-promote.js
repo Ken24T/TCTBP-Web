@@ -317,7 +317,16 @@ function prepareTargetBranch(target, dryRun) {
   const remoteTargetExists = gitRemoteBranchExists(targetBranch);
 
   if (!localTargetExists && !remoteTargetExists) {
-    fail(`Promotion target branch '${targetBranch}' does not exist locally or on origin.`);
+    if (!target.allowFirstTargetPublish) {
+      fail(`Promotion target branch '${targetBranch}' does not exist locally or on origin.`);
+    }
+    // First promotion into a branch that has never been created: seed the local
+    // target from the current source branch (the promotion is required to run
+    // from the source branch), then let the merge below produce the candidate.
+    // The target is published afterwards because allowFirstTargetPublish is set.
+    const sourceBranch = target.sourceBranch || getCurrentBranch();
+    runMutableGit(["switch", "-c", targetBranch, sourceBranch], dryRun, `Create local ${targetBranch} branch from ${sourceBranch}`);
+    return;
   }
 
   if (!localTargetExists) {

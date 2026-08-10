@@ -7,9 +7,12 @@ const path = require("path");
 const test = require("node:test");
 const {
   detectVersionFileFormat,
+  parseTomlPackageName,
   parseTomlPackageVersion,
   readVersionFile,
+  renderCargoLockPackageVersion,
   renderTomlPackageVersion,
+  syncCargoLockVersion,
   writeVersionFile
 } = require("./tctbp-profile-io");
 
@@ -116,6 +119,92 @@ test("writeVersionFile fails cleanly for unsupported formats", () => {
     const result = writeVersionFile(file, "1.0.0");
     assert.equal(result.ok, false);
     assert.match(result.error, /Unsupported version file format/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("parseTomlPackageName reads the [package] name", () => {
+  assert.equal(parseTomlPackageName(CARGO_TOML), "rust-calendar");
+});
+
+test("parseTomlPackageName returns null without a [package] name", () => {
+  assert.equal(parseTomlPackageName("[package]\nversion = \"0.2.0\"\n"), null);
+  assert.equal(parseTomlPackageName("[dependencies]\nname = \"x\"\n"), null);
+});
+
+const CARGO_LOCK = [
+  '[[package]]',
+  'name = "anyhow"',
+  'version = "1.0.1"',
+  'source = "registry+https://github.com/rust-lang/crates.io-index"',
+  '',
+  '[[package]]',
+  'name = "rust-calendar"',
+  'version = "2.4.39"',
+  'dependencies = [',
+  ' "anyhow",',
+  ']',
+  '',
+  '[[package]]',
+  'name = "serde"',
+  'version = "1.0.2"',
+  'source = "registry+https://github.com/rust-lang/crates.io-index"',
+  ''
+].join("\n");
+
+test("renderCargoLockPackageVersion rewrites only the matching [[package]] version", () => {
+  const rendered = renderCargoLockPackageVersion(CARGO_LOCK, "rust-calendar", "2.4.40");
+  assert.ok(rendered);
+  assert.equal(rendered, CARGO_LOCK.replace('version = "2.4.39"', 'version = "2.4.40"'));
+  // Dependency versions are untouched.
+  assert.ok(rendered.includes('name = "anyhow"'));
+  assert.ok(rendered.includes('version = "1.0.1"'));
+  assert.ok(rendered.includes('name = "serde"'));
+  assert.ok(rendered.includes('version = "1.0.2"'));
+});
+
+test("renderCargoLockPackageVersion returns null for a missing package", () => {
+  assert.equal(renderCargoLockPackageVersion(CARGO_LOCK, "does-not-exist", "1.0.0"), null);
+});
+
+test("syncCargoLockVersion is a no-op for non-Cargo version files", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tctbp-lock-json-"));
+  try {
+    const file = path.join(root, "package.json");
+    fs.writeFileSync(file, '{"version":"1.0.0"}\n', "utf8");
+    assert.deepEqual(syncCargoLockVersion(file, "1.1.0"), { ok: true, updated: false, path: null });
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("syncCargoLockVersion is a no-op when no lockfile exists", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tctbp-lock-none-"));
+  try {
+    const file = path.join(root, "Cargo.toml");
+    fs.writeFileSync(file, CARGO_TOML, "utf8");
+    assert.deepEqual(syncCargoLockVersion(file, "0.3.0"), { ok: true, updated: false, path: null });
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("syncCargoLockVersion updates the sibling Cargo.lock in place", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tctbp-lock-sync-"));
+  try {
+    const toml = path.join(root, "Cargo.toml");
+    const lock = path.join(root, "Cargo.lock");
+    fs.writeFileSync(toml, CARGO_TOML, "utf8");
+    fs.writeFileSync(lock, CARGO_LOCK, "utf8");
+    const result = syncCargoLockVersion(toml, "0.3.0");
+    assert.equal(result.ok, true);
+    assert.equal(result.updated, true);
+    assert.equal(result.path, lock);
+    const synced = fs.readFileSync(lock, "utf8");
+    assert.ok(synced.includes('name = "rust-calendar"'));
+    assert.ok(synced.includes('version = "0.3.0"'));
+    assert.ok(synced.includes('version = "1.0.1"'));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

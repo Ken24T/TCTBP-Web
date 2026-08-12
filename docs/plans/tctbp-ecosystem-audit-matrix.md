@@ -97,3 +97,43 @@ alias-not-activated@preflight      alias-not-activated@release
 alias-not-activated@ticket         scaffold-surface-gap@hotfix
 section-trigger-mismatch@ship
 ```
+
+## Phase 3 Resolution Status (2026-08-13)
+
+All Phase 3 semantic decisions from the decision log have been applied to
+TCTBP-Web, and the consistency audit now reports **zero discrepancies**.
+
+| # | Discrepancy | Resolution |
+|---|---|---|
+| D1 | ticket not activated | ✅ `ticket create/report/triage` added to `activation.triggers` + generated scaffold profiles |
+| D2 | release not activated | ✅ `release` / `release please` / `prepare release please` added to `activation.triggers` + scaffold profiles; `release` profile section added |
+| D3 | `prepare release` owned by ship | ✅ moved to the `release` section (ship section + cheatsheet + agent body updated); documented as a behavioural change |
+| D4 | preflight informal | ✅ formalised: `scripts/tctbp-run-preflight.js` (non-mutating aggregate verification), `preflight`/`preflight please` activated, profile section, scaffold inventory, agent docs, adviser vocabulary |
+| D5 | hotfix not scaffold-managed | ✅ `tctbp-run-hotfix.js` added to scaffold `RUNNER_FILES` |
+| D6 | adviser vocabulary lag | ✅ `adviserVocabulary.workflowIds` + `tctbp-status-model.js` `WORKFLOW_IDS` aligned to all 19 public workflows |
+| D7 | agent frontmatter gaps | ✅ hotfix/release/ticket/preflight added to `agents/TCTBP.agent.md` description |
+| D8 | Adviser README stale pin | ⏳ Adviser repo — deferred to Phase 5/6 |
+| D9 | Adviser capability drift | ⏳ Adviser repo — deferred to Phase 5/6 |
+| D10 | cheatsheet advertises internal `workflow` dispatcher | ✅ `workflow` row removed from the cheatsheet trigger table |
+| D11 | cheatsheet orient predates runner | ✅ orient row now references `tctbp-run-orient.js` |
+
+New consistency infrastructure:
+
+- `scripts/tctbp-workflow-catalogue.js` — canonical catalogue (19 public + 1
+  internal workflow) with alias ownership, runner, scaffold-managed, agent
+  frontmatter, and adviser-vocabulary metadata plus `auditCatalogue()`.
+- `test/tctbp-workflow-catalogue.test.js` — 15 tests enforcing the catalogue
+  invariants; the audit is pinned to zero violations.
+- `scripts/tctbp-run-preflight.js` — the formalised preflight runner.
+
+Test status: **97/97 pass** in TCTBP-Web (82 baseline + 15 catalogue/preflight).
+Scaffold-generated profiles in both `tctbp-run-scaffold.js` and
+`tctbp-scaffold-profile.js` now carry the canonical trigger surface.
+
+Remaining for later phases:
+
+- Phase 4: shared managed-surface manifest (deduplicate the two scaffold
+  `generateProfile` copies and the scaffold inventory arrays).
+- Phase 5/6: Adviser contract upgrade + reference/recommendation alignment
+  (D8/D9 and the Adviser `WORKFLOW_REFERENCES` lag).
+- Phase 7: end-to-end proving exercise with a throwaway scaffold.

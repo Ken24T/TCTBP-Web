@@ -40,6 +40,7 @@
     ],
     "workflowIds": [
       "status",
+      "preflight",
       "abort",
       "resume",
       "checkpoint",
@@ -289,6 +290,8 @@
       "orient please",
       "status",
       "status please",
+      "preflight",
+      "preflight please",
       "abort",
       "ticket create",
       "ticket report",
@@ -385,6 +388,17 @@
     "resumeCommand": "node scripts/tctbp-run-release.js --resume",
     "purpose": "Orchestrate the complete configured environment pipeline (deploy, promote, ship, final production deploy) with an atomic release journal and candidate revalidation. `prepare release` is owned by release, not ship.",
     "comment": "release is the composite pipeline orchestrator; ship remains the single formal production release step. This is a documented behavioural change: `prepare release` previously routed to ship."
+  },
+  "preflight": {
+    "preferredTriggers": [
+      "preflight",
+      "preflight please"
+    ],
+    "executionCommand": "node scripts/tctbp-run-preflight.js",
+    "dryRunCommand": "node scripts/tctbp-run-preflight.js --dry-run",
+    "purpose": "Non-mutating aggregate verification of the current working state before preserving, publishing, handing over, promoting, deploying, or otherwise advancing. Reports PASS / FAIL / NOT-CONFIGURED and detects any side effects caused by verification commands.",
+    "neverMutates": true,
+    "comment": "preflight never commits, pushes, tags, merges, switches branch, deploys, bumps a version, or touches remote state. Individual gate test/lint/build remain available for targeted diagnostics."
   },
   "publish": {
     "preferredTriggers": [

@@ -17,6 +17,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 
 const {
   PUBLIC_WORKFLOWS,
@@ -142,7 +143,7 @@ test("every activation trigger resolves to exactly one workflow", () => {
   );
 });
 
-test("every public alias is activated (current gaps pinned as D1/D2/D4)", () => {
+test("every public alias is activated", () => {
   const profile = loadProfile();
   const triggers = new Set(
     (profile.activation.triggers || []).map((trigger) => trigger.toLowerCase())
@@ -159,25 +160,11 @@ test("every public alias is activated (current gaps pinned as D1/D2/D4)", () => 
     const missing = workflow.aliases.filter(
       (alias) => !triggers.has(alias.toLowerCase())
     );
-    // Pin the exact currently-missing alias sets per known gap:
-    //   D4 preflight not yet formalised
-    //   (D1 ticket, D2 release, D3 prepare-release ownership now resolved)
-    const knownGaps = {
-      preflight: ["preflight", "preflight please"],
-    };
-    if (knownGaps[workflow.id]) {
-      assert.deepEqual(
-        missing,
-        knownGaps[workflow.id],
-        `unexpected alias activation state for "${workflow.id}" while D1/D2/D4 gaps are open`
-      );
-    } else {
-      assert.deepEqual(
-        missing,
-        [],
-        `workflow "${workflow.id}" has aliases that are not activated: ${missing.join(", ")}`
-      );
-    }
+    assert.deepEqual(
+      missing,
+      [],
+      `workflow "${workflow.id}" has aliases that are not activated: ${missing.join(", ")}`
+    );
   }
 });
 
@@ -236,14 +223,14 @@ test("every scaffold-managed public runner is in the scaffold inventory (D5 reso
 // Agent frontmatter coverage
 // ---------------------------------------------------------------------------
 
-test("agent activation frontmatter covers every public workflow (D7 resolved)", () => {
+test("agent activation frontmatter covers every public workflow", () => {
   const violations = audit().filter(
     (violation) => violation.code === "agent-frontmatter-gap"
   );
   assert.deepEqual(
     violations.map(violationKey).sort(),
-    ["agent-frontmatter-gap@preflight"],
-    `Expected only the D4 preflight frontmatter gap. Actual:\n${JSON.stringify(violations, null, 2)}`
+    [],
+    `unexpected agent frontmatter gaps:\n${JSON.stringify(violations, null, 2)}`
   );
 });
 
@@ -251,14 +238,14 @@ test("agent activation frontmatter covers every public workflow (D7 resolved)", 
 // Adviser vocabulary consistency
 // ---------------------------------------------------------------------------
 
-test("adviserVocabulary covers every public workflow (D6 resolved)", () => {
+test("adviserVocabulary covers every public workflow", () => {
   const violations = audit().filter(
     (violation) => violation.code === "adviser-vocab-gap"
   );
   assert.deepEqual(
     violations.map(violationKey).sort(),
-    ["adviser-vocab-gap@preflight"],
-    `Expected only the D4 preflight vocabulary gap. Actual:\n${JSON.stringify(violations, null, 2)}`
+    [],
+    `unexpected adviser vocabulary gaps:\n${JSON.stringify(violations, null, 2)}`
   );
 });
 
@@ -290,24 +277,32 @@ test("profile workflow sections own exactly their catalogue triggers (D3 resolve
 });
 
 // ---------------------------------------------------------------------------
-// Pinned known-gap set (Phase 2 acceptance gate)
+// Known-gap set (Phase 2 acceptance gate → Phase 3 resolution)
 // ---------------------------------------------------------------------------
 
-test("consistency audit pins the full currently-known discrepancy set (D1-D7)", () => {
+test("consistency audit reports zero discrepancies (D1-D7 all resolved)", () => {
   const violations = audit();
-  const actual = violations.map(violationKey).sort();
-  const expected = [
-    // D4 preflight not yet formalised
-    // (D1 ticket, D2 release, D3 prepare-release, D5 hotfix scaffold,
-    //  D6 adviser vocabulary, D7 agent frontmatter now resolved)
-    "agent-frontmatter-gap@preflight",
-    "adviser-vocab-gap@preflight",
-    "alias-not-activated@preflight",
-  ].sort();
-
   assert.deepEqual(
-    actual,
-    expected,
-    `Known-gap pin mismatch. The audit must catch exactly the documented D1-D7 discrepancies.\nActual:\n${JSON.stringify(violations, null, 2)}`
+    violations.map(violationKey).sort(),
+    [],
+    `Consistency audit must be clean after Phase 3. Actual:\n${JSON.stringify(violations, null, 2)}`
   );
+});
+
+// ---------------------------------------------------------------------------
+// Preflight runner smoke test
+// ---------------------------------------------------------------------------
+
+test("preflight dry-run loads and plans without mutating the repository", () => {
+  const result = spawnSync(
+    process.execPath,
+    ["scripts/tctbp-run-preflight.js", "--dry-run"],
+    { cwd: projectRoot, encoding: "utf8" }
+  );
+  assert.equal(
+    result.status,
+    0,
+    `preflight --dry-run failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+  assert.match(result.stdout, /Preflight summary: PASS/);
 });

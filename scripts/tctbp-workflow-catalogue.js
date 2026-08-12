@@ -55,9 +55,9 @@ const PUBLIC_WORKFLOWS = [
   {
     id: "preflight",
     displayName: "Preflight",
-    runner: null, // not yet implemented; formalisation is a Phase 3 decision
+    runner: "scripts/tctbp-run-preflight.js",
     aliases: ["preflight", "preflight please"],
-    scaffoldManaged: false,
+    scaffoldManaged: true,
     agentToken: "preflight",
     adviserVocab: true,
   },

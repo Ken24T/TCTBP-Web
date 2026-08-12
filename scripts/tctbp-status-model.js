@@ -14,6 +14,7 @@ const DEFAULT_ADVISER_CONTRACT = Object.freeze({
 
 const WORKFLOW_IDS = [
   "status",
+  "preflight",
   "abort",
   "resume",
   "checkpoint",

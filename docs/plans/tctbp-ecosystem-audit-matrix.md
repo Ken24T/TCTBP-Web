@@ -308,3 +308,43 @@ heavy profile customization). Full reconcile on branch
   the two scaffold factory-only residuals.**
 
 Merged to Adviser `development` at `c27c8e0` and pushed.
+
+## Do-No-Harm Assessment: ddre-intranet-local (2026-08-13)
+
+**Verdict: NO-GO for the current reconcile machinery.** ddre-intranet-local is
+on a **different TCTBP lineage** — not compatible with the TCTBP-Web schema-11
+surface the machinery was built and validated against. Read-only audit only;
+zero content changes were made.
+
+Evidence (all read-only):
+
+- **Schema 15 vs canonical 11.** The merge would rewrite `schemaVersion` 15→11
+  into a profile the app's own tooling reads at 15.
+- **Different profile vocabulary.** ddre has 7 top-level keys that do not exist
+  canonically (`productionBackup`, `releaseCandidateBinding`, `resumableRelease`,
+  `hotfix`, `build`, `runtimePublication`, `deploymentAlignment`) and has NO
+  `adviserContract`/`adviserVocabulary`/hardening areas. The merge would inject
+  canonical `adviserVocabulary` (0→19) and force all four hardening areas on,
+  while ddre deliberately disables them and uses its own safety vocabulary.
+- **Different runner lineage.** 28 runner files in `scripts/` differ from
+  canonical and would be overwritten by schema-11 runners that read profile
+  keys ddre does not have.
+- **All five critical `.github` files are customized** (`TCTBP Agent.md`,
+  `TCTBP Cheatsheet.md`, `agents/TCTBP.agent.md`, `hooks/tctbp-safety.json`,
+  `copilot-instructions.md`) — the reconcile would overwrite every one.
+- **6 of ddre's 60 activation triggers are unknown to the canonical catalogue**
+  — the audit cannot even fully interpret its trigger surface.
+
+Safety posture applied:
+
+- Layer 0: synced `development` to origin (`864efa8a`, ff-only — local was a
+  strict ancestor, nothing orphaned), created and **pushed** the additive
+  snapshot `safety/ddre-pre-reconcile-2026-08-13` tag + `backup/...` branch.
+- Layer 1: read-only schema audit, managed-file diff, and merge preview. No
+  content in ddre was modified (working tree clean, HEAD unchanged).
+
+Follow-up options (none executed): (a) leave ddre on its own lineage and
+maintain it separately; (b) a deliberate, separately-scoped schema-15→11
+migration project with explicit mapping and production-aware review; (c)
+selectively port individual fixes (e.g., the gates `release-build` fix) with
+manual review. ddre is not a candidate for the generic reconcile as it stands.

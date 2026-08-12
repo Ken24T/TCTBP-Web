@@ -168,3 +168,22 @@ Acceptance gate:
   contract capabilities, and the full managed surface ✅
 
 Test status: **105/105 pass** in TCTBP-Web.
+
+## Phase 5/6 Resolution Status (2026-08-13)
+
+Adviser upgrade work performed on branch `upgrade/tctbp-web-08d2979` in the
+TCTBP-Adviser repo, pinned to TCTBP-Web plan-branch revision
+`08d2979d5d70480e85477cdeb10dfb3fb83a0332`.
+
+| Item | Status |
+|---|---|
+| D8 — Adviser README stale pin | ✅ README pins `08d2979…` |
+| D9 — Adviser capability drift | ✅ `version-files.multi-format-v1` recorded in `.tctbp/source.json` and `server/tctbp-source.ts` |
+| Source metadata exact | ✅ `.tctbp/source.json`, `server/reference/catalogue.ts` SOURCE_REVISION, and README all pin `08d2979…` |
+| Reference catalogue expansion | ✅ `WORKFLOW_REFERENCES` grows 10 → 19 (adds preflight, orient, release, hotfix, gate, version, rollback, ticket, scaffold); `CoreWorkflowId` + `category` union extended in `shared/reference.ts` |
+| Recommendation alignment | ✅ `preflight` added as a `RecommendationAction`; dirty-tree recommendation now suggests checkpoint with preflight as a likely next action |
+| Adviser remains non-executing | ✅ no target workflow execution added |
+| Adviser tests | ✅ 337/337 pass, typecheck clean, build succeeds |
+
+Adviser contract remains major 1 minor 0 with additive capability metadata
+only — no breaking contract change.

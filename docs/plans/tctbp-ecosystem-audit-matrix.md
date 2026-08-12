@@ -283,3 +283,28 @@ A reusable **read-only reconcile-plan tool** now lives in the Adviser
 reconciles compute the plan before touching anything.
 
 Adviser now **343/343** tests.
+
+## Real-Consumer Reconcile: TCTBP-Adviser (2026-08-13)
+
+The dogfood repo — the most complex consumer (review-enabled, 71 test files,
+heavy profile customization). Full reconcile on branch
+`reconcile/tctbp-web-surface`, using the read-only plan tool first:
+
+- Plan surfaced **one new canonical gap**: Adviser's activation had
+  `deploy review` / `deploy review please`, which the canonical deploy family
+  did not contain (we added `promote review` in Phase 7 but never `deploy
+  review`) — so long-lived/review repos could never receive it from scaffold or
+  reconcile, and the audit flagged it as an unknown trigger.
+  **Fixed canonically** (catalogue + manifest `ACTIVATION_TRIGGERS` + canonical
+  activation) and committed to `TCTBP-Web/main` (`22c9b87`).
+- Reviewed the agent/docs overwrite concern: Adviser's agent files were stale
+  canonical copies (no Adviser-specific content) — safe to overwrite.
+- Applied: 3 runner files added (preflight/manifest/catalogue; hotfix already
+  present), 7 changed (gates fix, status-model, scaffold-profile, agent docs),
+  profile merged 64 → **69 triggers** (nothing removed, deploy review
+  preserved), vocab 11 → 19, `.tctbp/source.json` pinned to `22c9b87`.
+- **Verified: app code untouched (zero server/src/shared changes), Adviser
+  full suite 343/343 passes, typecheck clean, build succeeds, audit shows only
+  the two scaffold factory-only residuals.**
+
+Merged to Adviser `development` at `c27c8e0` and pushed.

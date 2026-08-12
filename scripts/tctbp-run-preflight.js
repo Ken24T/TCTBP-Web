@@ -31,6 +31,7 @@ const {
   getWorkingTreeStatus
 } = require("./tctbp-git-ops");
 const { loadPolicy } = require("./tctbp-profile-io");
+const { resolveProfileCommand } = require("./tctbp-gates");
 const { fail, logSection } = require("./tctbp-output");
 
 const repoRoot = resolveRepoRoot();
@@ -138,7 +139,7 @@ function main() {
   // 4. Configured quality gates (test / lint / build / format / release-build).
   const gateRows = [["Gate", "Result", "Command / note"]];
   for (const [gateName, label] of GATE_ORDER) {
-    const command = commands[gateName];
+    const command = resolveProfileCommand(commands, gateName);
     if (!command || typeof command !== "string" || command.trim().length === 0) {
       gateRows.push([label, "NOT-CONFIGURED", "no profile command"]);
       continue;

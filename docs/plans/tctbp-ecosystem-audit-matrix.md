@@ -343,8 +343,47 @@ Safety posture applied:
 - Layer 1: read-only schema audit, managed-file diff, and merge preview. No
   content in ddre was modified (working tree clean, HEAD unchanged).
 
-Follow-up options (none executed): (a) leave ddre on its own lineage and
-maintain it separately; (b) a deliberate, separately-scoped schema-15→11
-migration project with explicit mapping and production-aware review; (c)
-selectively port individual fixes (e.g., the gates `release-build` fix) with
-manual review. ddre is not a candidate for the generic reconcile as it stands.
+Follow-up options: (a) leave ddre on its own lineage and maintain it
+separately; (b) a deliberate, separately-scoped schema-15→11 migration project
+with explicit mapping and production-aware review; (c) selectively port
+individual fixes with manual review. ddre is not a candidate for the generic
+reconcile as it stands.
+
+## Selective Review Outcome: ddre-intranet-local (2026-08-13)
+
+**Correction to this record.** After the NO-GO above, two selective
+improvements were considered against ddre's actual files and **both were
+withdrawn after real inspection**. The earlier suggestion that the gates
+`release-build` fix could be ported assumed ddre's runner works like
+canonical's — it does not.
+
+- **Gates `release-build` fix — WRONG PREMISE, withdrawn.** ddre's
+  `scripts/tctbp-run-gate.js` uses a hardcoded npm gate map and never reads
+  `profile.commands`, so the canonical `releaseBuild` vs `release-build` key
+  mismatch (a real TCTBP-Web bug, fixed canonically and verified on
+  audio-extractor/kindling) does **not** exist in ddre. There was nothing to
+  fix.
+- **Preflight port — not surgically viable, withdrawn.** Preflight depends on
+  four modules ddre does not have (`tctbp-git-ops.js`, `tctbp-profile-io.js`,
+  `tctbp-output.js`, `tctbp-gates.js`; only `tctbp-runtime.js` exists) and on
+  a root `package.json` that does not exist (monorepo — package lives under
+  `spfx/intranet-core/dev/`). Porting it would inject the whole canonical
+  helper layer — a mini-reconcile, not a selective improvement — and was
+  rejected under the do-no-harm posture.
+
+**Conclusion: leave ddre on its own lineage.** Its runners, gate logic, and
+helper modules are self-contained; the canonical surface's value-adds either
+do not apply (gate premise wrong) or cannot arrive without dragging in the
+entire machinery (preflight deps). Any real improvement should come through
+option (b) (deliberate migration) or an explicit, user-specified ask reviewed
+against ddre's actual files.
+
+**Doc-surface improvement applied (2026-08-13).** The one safe, worthwhile
+change was documentation-only: the backup/restore-rehearsal family (`backup
+production`, `backup prod`, `rehearse production restore`, `restore
+rehearsal`) and `hotfix` were live activation triggers with first-class tested
+runners (`tctbp-run-backup.js`, `tctbp-run-restore-rehearsal.js`) but were
+absent from the cheatsheet, `copilot-instructions.md`, the agent frontmatter,
+and largely from `TCTBP Agent.md`. All four instruction files now document
+them (committed to ddre `development` at `e0ca99f5`; agent frontmatter YAML
+validated). No runner, JSON, or policy content was changed.

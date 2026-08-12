@@ -114,22 +114,21 @@ function generateProfile(answers) {
     activation: {
       triggers: ACTIVATION_TRIGGERS,
       caseInsensitive: true,
+      branchCommand: {
+        enabled: true,
+        pattern: "^branch(?:\\s+(.+))?$",
+        allowCloseoutWithoutNewBranch: true,
+        stopIfTargetBranchExistsLocal: true,
+        stopIfTargetBranchExistsRemote: true,
+        stopIfTargetBranchEqualsDefault: true,
+        stopIfTargetBranchInvalid: true,
+      },
     },
     deploy: {
       enabled: deployTarget !== "none yet",
       targets: {},
     },
-    codeLossPrevention: {
-      enabled: true,
-      safetyTagsEnabled: true,
-      mergeDeletionAudit: {
-        enabled: true,
-        warnThreshold: { files: 1, lines: 500 },
-        stopThreshold: { files: 5, lines: 500 },
-        hardStopThreshold: { files: 20, lines: 2000 },
-      },
-      prePushNetDeletionCheck: { enabled: true, mode: "warn" },
-    },
+    ...contractMetadata.hardening,
     versioning: {
       scheme: "semver",
       patchEveryShip: true,
@@ -165,7 +164,14 @@ function readContractMetadata() {
   return {
     schemaVersion: sourceProfile.schemaVersion,
     adviserContract: sourceProfile.adviserContract,
-    adviserVocabulary: sourceProfile.adviserVocabulary
+    adviserVocabulary: sourceProfile.adviserVocabulary,
+    hardening: {
+      candidateGuard: sourceProfile.candidateGuard,
+      promotionSafety: sourceProfile.promotionSafety,
+      releaseState: sourceProfile.releaseState,
+      runtimeTransaction: sourceProfile.runtimeTransaction,
+      codeLossPrevention: sourceProfile.codeLossPrevention
+    }
   };
 }
 

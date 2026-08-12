@@ -130,6 +130,8 @@ const PUBLIC_WORKFLOWS = [
       "promote please",
       "promote staging",
       "promote staging please",
+      "promote review",
+      "promote review please",
       "promote production",
       "promote production please",
       "promote prod",

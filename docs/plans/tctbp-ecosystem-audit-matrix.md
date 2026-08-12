@@ -187,3 +187,41 @@ TCTBP-Adviser repo, pinned to TCTBP-Web plan-branch revision
 
 Adviser contract remains major 1 minor 0 with additive capability metadata
 only — no breaking contract change.
+
+## Phase 7 Resolution Status (2026-08-13)
+
+The end-to-end proving exercise is implemented as a lasting integration test:
+`server/ecosystem-proving.test.ts` in the TCTBP-Adviser repo. It scaffolds a
+throwaway project from TCTBP-Web, inspects it with the Adviser policy
+comparison, checks workflow-catalogue agreement, simulates drift, confirms the
+Adviser detects it, generates an upgrade-safe merge, and verifies no
+application-owned configuration is lost. The whole sequence passes.
+
+| Proving step | Status |
+|---|---|
+| 1. scaffold a new project | ✅ |
+| 2. inspect it with Adviser (`compareTctbpPolicy` → aligned) | ✅ |
+| 3. workflow catalogue agreement (scaffolded vocab == Adviser `WORKFLOW_REFERENCES`, 19 ids) | ✅ |
+| 8. Copilot in the target repo recognises the same workflow set (the scaffolded project's own catalogue audit reports only the two factory-only `scaffold` violations) | ✅ |
+| 4-5. simulated drift (drop `preflight`) is detected as `drifted` | ✅ |
+| 6-7. canonical merge restores the canonical surface | ✅ |
+| 9. no application-owned config lost (name, test command, non-template governance) | ✅ |
+
+The proving exercise surfaced and fixed **three real scaffold gaps**:
+
+1. **`promote review` missing from the canonical catalogue/activation** — the
+   generated profiles already advertised `promote review` (long-lived
+   strategy), but the canonical catalogue and TCTBP-Web activation did not.
+   Aligned by adding `promote review` / `promote review please` to both.
+2. **`activation.branchCommand` missing from generated profiles** — the branch
+   workflow is pattern-triggered, but scaffolded profiles had no `branchCommand`
+   config, so the branch workflow would not function. Added to the canonical
+   profile generator.
+3. **Hardening areas missing from generated profiles** — `candidateGuard`,
+   `promotionSafety`, `releaseState`, and `runtimeTransaction` were absent, so
+   the Adviser drift check reported a fresh scaffold as drifted. The canonical
+   profile generator now mirrors the canonical hardening sections (keeping them
+   in sync automatically via `readContractMetadata`).
+
+Final status: **TCTBP-Web 105/105** and **Adviser 338/338** tests pass, Adviser
+typecheck + build clean.

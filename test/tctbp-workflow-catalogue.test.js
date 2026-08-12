@@ -160,13 +160,10 @@ test("every public alias is activated (current gaps pinned as D1/D2/D4)", () => 
       (alias) => !triggers.has(alias.toLowerCase())
     );
     // Pin the exact currently-missing alias sets per known gap:
-    //   D1 ticket not activated
-    //   D2 release not activated (prepare release is active but owned by ship -> D3)
-    //   D4 preflight not formalised
+    //   D4 preflight not yet formalised
+    //   (D1 ticket, D2 release, D3 prepare-release ownership now resolved)
     const knownGaps = {
       preflight: ["preflight", "preflight please"],
-      release: ["release", "release please", "prepare release please"],
-      ticket: ["ticket create", "ticket report", "ticket triage"],
     };
     if (knownGaps[workflow.id]) {
       assert.deepEqual(
@@ -218,20 +215,20 @@ test("every scaffold-managed public runner exists in the scripts directory", () 
 // Scaffold managed-surface consistency
 // ---------------------------------------------------------------------------
 
-test("every scaffold-managed public runner is in the scaffold inventory (D5 pinned)", () => {
+test("every scaffold-managed public runner is in the scaffold inventory (D5 resolved)", () => {
   const scaffoldInventory = extractScaffoldRunnerFiles();
   const violations = audit().filter(
     (violation) => violation.code === "scaffold-surface-gap"
   );
   assert.deepEqual(
     violations.map(violationKey).sort(),
-    ["scaffold-surface-gap@hotfix"],
-    `Expected exactly the D5 hotfix scaffold gap. Actual:\n${JSON.stringify(violations, null, 2)}`
+    [],
+    `unexpected scaffold surface gaps:\n${JSON.stringify(violations, null, 2)}`
   );
   assert.equal(
     scaffoldInventory.includes("tctbp-run-hotfix.js"),
-    false,
-    "precondition: hotfix runner must currently be absent from scaffold RUNNER_FILES"
+    true,
+    "hotfix runner must be present in the scaffold RUNNER_FILES inventory"
   );
 });
 
@@ -239,19 +236,14 @@ test("every scaffold-managed public runner is in the scaffold inventory (D5 pinn
 // Agent frontmatter coverage
 // ---------------------------------------------------------------------------
 
-test("agent activation frontmatter covers every public workflow (D7 pinned)", () => {
+test("agent activation frontmatter covers every public workflow (D7 resolved)", () => {
   const violations = audit().filter(
     (violation) => violation.code === "agent-frontmatter-gap"
   );
   assert.deepEqual(
     violations.map(violationKey).sort(),
-    [
-      "agent-frontmatter-gap@hotfix",
-      "agent-frontmatter-gap@preflight",
-      "agent-frontmatter-gap@release",
-      "agent-frontmatter-gap@ticket",
-    ].sort(),
-    `Expected the D7 frontmatter gaps. Actual:\n${JSON.stringify(violations, null, 2)}`
+    ["agent-frontmatter-gap@preflight"],
+    `Expected only the D4 preflight frontmatter gap. Actual:\n${JSON.stringify(violations, null, 2)}`
   );
 });
 
@@ -259,23 +251,14 @@ test("agent activation frontmatter covers every public workflow (D7 pinned)", ()
 // Adviser vocabulary consistency
 // ---------------------------------------------------------------------------
 
-test("adviserVocabulary covers every public workflow (D6 pinned)", () => {
+test("adviserVocabulary covers every public workflow (D6 resolved)", () => {
   const violations = audit().filter(
     (violation) => violation.code === "adviser-vocab-gap"
   );
   assert.deepEqual(
     violations.map(violationKey).sort(),
-    [
-      "adviser-vocab-gap@gate",
-      "adviser-vocab-gap@orient",
-      "adviser-vocab-gap@preflight",
-      "adviser-vocab-gap@release",
-      "adviser-vocab-gap@rollback",
-      "adviser-vocab-gap@scaffold",
-      "adviser-vocab-gap@ticket",
-      "adviser-vocab-gap@version",
-    ].sort(),
-    `Expected the D6 adviser vocabulary gaps. Actual:\n${JSON.stringify(violations, null, 2)}`
+    ["adviser-vocab-gap@preflight"],
+    `Expected only the D4 preflight vocabulary gap. Actual:\n${JSON.stringify(violations, null, 2)}`
   );
 });
 
@@ -295,14 +278,14 @@ test("adviserVocabulary contains no unknown workflow ids", () => {
 // Profile section ownership
 // ---------------------------------------------------------------------------
 
-test("profile workflow sections own exactly their catalogue triggers (D3 pinned)", () => {
+test("profile workflow sections own exactly their catalogue triggers (D3 resolved)", () => {
   const violations = audit().filter(
     (violation) => violation.code === "section-trigger-mismatch"
   );
   assert.deepEqual(
     violations.map(violationKey).sort(),
-    ["section-trigger-mismatch@ship"],
-    `Expected the D3 prepare-release ownership mismatch. Actual:\n${JSON.stringify(violations, null, 2)}`
+    [],
+    `unexpected section trigger mismatches:\n${JSON.stringify(violations, null, 2)}`
   );
 });
 
@@ -314,28 +297,12 @@ test("consistency audit pins the full currently-known discrepancy set (D1-D7)", 
   const violations = audit();
   const actual = violations.map(violationKey).sort();
   const expected = [
-    // D7 agent activation frontmatter gaps
-    "agent-frontmatter-gap@hotfix",
+    // D4 preflight not yet formalised
+    // (D1 ticket, D2 release, D3 prepare-release, D5 hotfix scaffold,
+    //  D6 adviser vocabulary, D7 agent frontmatter now resolved)
     "agent-frontmatter-gap@preflight",
-    "agent-frontmatter-gap@release",
-    "agent-frontmatter-gap@ticket",
-    // D6 adviser vocabulary gaps
-    "adviser-vocab-gap@gate",
-    "adviser-vocab-gap@orient",
     "adviser-vocab-gap@preflight",
-    "adviser-vocab-gap@release",
-    "adviser-vocab-gap@rollback",
-    "adviser-vocab-gap@scaffold",
-    "adviser-vocab-gap@ticket",
-    "adviser-vocab-gap@version",
-    // D1 ticket / D2 release / D4 preflight not activated
     "alias-not-activated@preflight",
-    "alias-not-activated@release",
-    "alias-not-activated@ticket",
-    // D5 hotfix not scaffold-managed
-    "scaffold-surface-gap@hotfix",
-    // D3 prepare release owned by ship
-    "section-trigger-mismatch@ship",
   ].sort();
 
   assert.deepEqual(

@@ -31,6 +31,7 @@ const RUNNER_FILES = [
   "tctbp-run-checkpoint.js",
   "tctbp-run-publish.js",
   "tctbp-run-handover.js",
+  "tctbp-run-hotfix.js",
   "tctbp-run-resume.js",
   "tctbp-run-ship.js",
   "tctbp-run-branch.js",

@@ -23,7 +23,14 @@ const WORKFLOW_IDS = [
   "promote",
   "deploy",
   "ship",
-  "hotfix"
+  "hotfix",
+  "release",
+  "ticket",
+  "gate",
+  "version",
+  "rollback",
+  "scaffold",
+  "orient"
 ];
 
 function createStatusDocument(input) {

@@ -252,3 +252,34 @@ Gaps discovered by the real reconcile — all resolved:
 The new merge machinery was verified to **exactly reproduce** the manual
 audio-extractor reconcile (47 triggers, same inclusions/exclusions, prepare
 release migrated). Adviser now 341/341 tests.
+
+## Real-Consumer Reconcile: kindling (2026-08-13)
+
+Second real reconcile — a **staged-strategy** repo (development → staging →
+main), structurally different from audio-extractor (simple). Full reconcile on
+branch `upgrade/tctbp-web-08d2979`, run with real Adviser merge machinery
+behind a read-only plan step:
+
+- Plan produced drift report + merged profile artifact + managed-file diff
+  before anything was written to the target.
+- Applied: 4 runner files added (preflight/hotfix/manifest/catalogue), 7
+  changed (gates fix, status-model, scaffold-profile, agent docs), profile
+  merged 49 → **65 triggers** (16 canonical families added, **nothing removed**),
+  vocab 11 → 19, `prepare release` migrated off ship, `.tctbp/source.json`
+  created (kindling had none).
+- Verified: preflight runs **4 real configured gates and passes** (confirming
+  the release-build gate fix on a configured repo); audit shows only expected
+  residuals (promote-review variants — staged has no review; scaffold —
+  factory-only).
+
+**New gap discovered and fixed:**
+
+| Gap | Resolution |
+|---|---|
+| The activation merge's applicability filter stripped **pre-existing target triggers** (kindling's deploy dev/staging/production variants were all removed because no deploy targets are mapped) — violating the "never overwrite project-owned settings" principle | ✅ Filter now gates **canonical additions only**; pre-existing target triggers are always preserved. Regression test added. |
+
+A reusable **read-only reconcile-plan tool** now lives in the Adviser
+(`server/kindling-plan.test.ts`, target via `TARGET_ROOT` env) so future
+reconciles compute the plan before touching anything.
+
+Adviser now **343/343** tests.

@@ -225,3 +225,30 @@ The proving exercise surfaced and fixed **three real scaffold gaps**:
 
 Final status: **TCTBP-Web 105/105** and **Adviser 338/338** tests pass, Adviser
 typecheck + build clean.
+
+## Real-Consumer Reconcile: audio-extractor (2026-08-13)
+
+audio-extractor (Rust workspace, simple strategy, custom `current-platform-artifacts`
+deploy) reconciled on branch `upgrade/tctbp-web-08d2979`:
+
+- Managed surface added (preflight/hotfix/manifest/catalogue runners, docs,
+  contract); profile merged preserving project-owned values (master default
+  branch, Cargo.toml version files, cargo commands, custom deploy, non-template
+  governance); vocab 11 → 19; activation completed 17 → 47 triggers; D3
+  migration applied; `.tctbp/source.json` pinned to `08d2979…`.
+- Verified: runners work, catalogue audit clean except intentional residuals
+  (promote/simple strategy, deploy variants/custom deploy, scaffold/factory).
+
+Gaps discovered by the real reconcile — all resolved:
+
+| Gap | Resolution |
+|---|---|
+| 1. `releaseBuild` vs `release-build` gate key mismatch (configured release gates silently ignored in gates/gate-runner/preflight) | ✅ `resolveProfileCommand` normalisation + tests (TCTBP-Web 108/108) |
+| 2. Activation not merged by `mergeCanonicalTctbpPolicy` (new canonical triggers never propagate) | ✅ deterministic strategy-aware activation merge: union of canonical + target triggers, filtered by scaffold (factory-only), promote/promote-review (promotion/review enabled), and deploy env variants (mapped targets) |
+| 3. `prepare release` ownership has no migration rule | ✅ `migratePrepareReleaseOwnership`: stripped from `ship.preferredTriggers`, ensured on `release` |
+| 4. Pre-existing audio-extractor quirks (promote/deploy variants never activated) | 📝 Documented as intentional deviations |
+| 5. Scaffold factory-only residuals | 📝 Expected |
+
+The new merge machinery was verified to **exactly reproduce** the manual
+audio-extractor reconcile (47 triggers, same inclusions/exclusions, prepare
+release migrated). Adviser now 341/341 tests.

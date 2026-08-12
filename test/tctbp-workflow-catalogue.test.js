@@ -26,6 +26,7 @@ const {
   resolveWorkflowForTrigger,
   auditCatalogue,
 } = require("../scripts/tctbp-workflow-catalogue");
+const { RUNNER_FILES: SCAFFOLD_RUNNER_FILES } = require("../scripts/tctbp-managed-surface");
 
 const projectRoot = path.resolve(__dirname, "..");
 
@@ -35,17 +36,9 @@ function loadProfile() {
   );
 }
 
-/** Extract the RUNNER_FILES inventory from the scaffold runner source. */
+/** Scaffold managed-surface inventory (shared manifest is the single source). */
 function extractScaffoldRunnerFiles() {
-  const src = fs.readFileSync(
-    path.join(projectRoot, "scripts", "tctbp-run-scaffold.js"),
-    "utf8"
-  );
-  const start = src.indexOf("const RUNNER_FILES = [");
-  assert.ok(start !== -1, "RUNNER_FILES inventory not found in tctbp-run-scaffold.js");
-  const end = src.indexOf("];", start);
-  const block = src.slice(start, end);
-  return [...block.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  return SCAFFOLD_RUNNER_FILES;
 }
 
 /** Extract the agent activation frontmatter (between leading --- fences). */

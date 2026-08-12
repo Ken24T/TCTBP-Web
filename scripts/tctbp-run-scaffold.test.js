@@ -17,9 +17,9 @@ test("scripts/package.json pins CommonJS for the runner scripts", () => {
 });
 
 test("RUNNER_FILES includes package.json so consumers receive the CommonJS pin", () => {
-  const scaffoldSource = fs.readFileSync(path.join(SCRIPTS_DIR, "tctbp-run-scaffold.js"), "utf8");
-  const match = /const\s+RUNNER_FILES\s*=\s*\[([\s\S]*?)\]\s*;/.exec(scaffoldSource);
-  assert.ok(match, "RUNNER_FILES array should exist in the scaffold runner");
+  const manifestSource = fs.readFileSync(path.join(SCRIPTS_DIR, "tctbp-managed-surface.js"), "utf8");
+  const match = /const\s+RUNNER_FILES\s*=\s*\[([\s\S]*?)\]\s*;/.exec(manifestSource);
+  assert.ok(match, "RUNNER_FILES array should exist in the managed-surface manifest");
   assert.ok(
     match[1].includes('"package.json"'),
     "RUNNER_FILES should include package.json so the CommonJS pin is copied to consumers",

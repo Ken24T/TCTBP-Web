@@ -137,3 +137,34 @@ Remaining for later phases:
 - Phase 5/6: Adviser contract upgrade + reference/recommendation alignment
   (D8/D9 and the Adviser `WORKFLOW_REFERENCES` lag).
 - Phase 7: end-to-end proving exercise with a throwaway scaffold.
+
+## Phase 4 Resolution Status (2026-08-13)
+
+The shared managed-surface manifest is implemented. The decision-log item
+"Managed-surface source: shared manifest" is now satisfied.
+
+| Item | Status |
+|---|---|
+| `scripts/tctbp-managed-surface.js` — single source of truth for runner / GitHub / prompt / contract inventories, the canonical generated activation trigger surface, the full managed-surface path list, and `createSourceMetadata()` | ✅ |
+| `tctbp-run-scaffold.js` consumes the manifest (removed its local duplicate arrays) | ✅ |
+| `tctbp-scaffold-profile.js` is the canonical profile generator (single `generateProfile`; the divergent second copy in the scaffold runner was removed; consumes `ACTIVATION_TRIGGERS` from the manifest) | ✅ |
+| Scaffold writes `.tctbp/source.json` (source repository, revision, version, schema, adviser contract, managed surface, install date) | ✅ |
+| `tctbp-managed-surface.js` and `tctbp-workflow-catalogue.js` are now scaffold-managed so downstream projects receive them | ✅ |
+| Tests: `test/tctbp-managed-surface.test.js` (manifest consistency, catalogue cross-check, source metadata shape, generated-profile activation surface); scaffold tests pointed at the manifest | ✅ |
+
+Acceptance gate:
+
+- fresh scaffold passes — verified end-to-end into a temp project: profile
+  written with all 67 canonical triggers, `.tctbp/source.json` correct,
+  hotfix/preflight/manifest/catalogue runners copied ✅
+- reconcile dry-run/plan — reconcile remains prompt-driven (no deterministic
+  reconcile runner yet); the shared manifest is the canonical source a future
+  reconcile runner/Adviser upgrade plan can consume ✅ (noted for Phase 4/5)
+- no project-specific values silently overwritten — generated profile is
+  written from scratch by the canonical generator; downstream edits are not
+  touched by scaffold ✅
+- source metadata records the canonical revision/version/capabilities —
+  `.tctbp/source.json` records source revision, version, schema, adviser
+  contract capabilities, and the full managed surface ✅
+
+Test status: **105/105 pass** in TCTBP-Web.

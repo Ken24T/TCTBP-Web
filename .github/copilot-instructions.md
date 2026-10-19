@@ -1,6 +1,16 @@
 # TCTBP-Web Template – Copilot Instructions
 
-> **TEMPLATE REPOSITORY ONLY.** These instructions apply to the TCTBP-Web template repo itself — not to projects scaffolded from it. Scaffolded projects receive a different set of instructions (see `templates/copilot-instructions.md.template`) focused on application development with file-size limits, modularity rules, and framework-specific conventions.
+## Shared code and documentation policy
+
+This repository adopts shared-development-policy 1.0.0. Read
+`.github/DEVELOPMENT_POLICY.md` and its machine-readable companion
+`.github/development-policy.json` for code, configuration and documentation work.
+Use `node scripts/check-modularity.cjs --changed` for advisory size signals.
+Record design reviews for new or materially changed large files in change notes.
+File size alone never requires a split or grants approval to commit or publish.
+Existing correctness, security, Git and approval protections remain in force.
+
+> **TEMPLATE REPOSITORY ONLY.** These instructions apply to the TCTBP-Web template repo itself — not to projects scaffolded from it. Scaffolded projects receive a different set of instructions (see `templates/copilot-instructions.md.template`) focused on application development with advisory modularity review and framework-specific conventions.
 
 ## Purpose
 

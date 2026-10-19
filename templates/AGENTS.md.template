@@ -1,0 +1,9 @@
+# Repository agent instructions
+
+## Shared code and documentation policy
+
+Follow `.github/DEVELOPMENT_POLICY.md` and `.github/development-policy.json`.
+Run `node scripts/check-modularity.cjs --changed` for advisory review signals.
+Code, configuration and documentation use the same policy. Size alone is not a
+failure or a reason to split; record the design review for changed large files.
+Existing safety, type, test and approval requirements remain in force.

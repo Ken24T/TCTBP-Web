@@ -303,6 +303,7 @@ function writeProjectSkeleton(answers) {
   writeTemplate(tpl(".gitignore.template"), path.join(answers.targetPath, ".gitignore"), answers);
   writeTemplate(tpl("README.md.template"), path.join(answers.targetPath, "README.md"), answers);
   writeTemplate(tpl("copilot-instructions.md.template"), path.join(answers.targetPath, ".github", "copilot-instructions.md"), answers);
+  writeTemplate(tpl("AGENTS.md.template"), path.join(answers.targetPath, "AGENTS.md"), answers);
 
   if (answers.framework === "vite") {
     writeViteTemplates(answers);

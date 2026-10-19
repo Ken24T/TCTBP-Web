@@ -4,32 +4,17 @@
 
 This is an **application repository**, not a template repo. You are editing a real project built with the TCTBP-Web workflow. The TCTBP runner surface in `scripts/` and `.github/` manages branch safety, versioning, and deployment — do not modify those files unless explicitly asked. Your job is to build the application code that lives alongside them.
 
-## Modularity Rules — Read First
+## Shared code and documentation policy
 
-These are hard constraints. AI agents tend to accrete code into existing files. Resist that.
+Follow `.github/DEVELOPMENT_POLICY.md` and `.github/development-policy.json`.
+Run `node scripts/check-modularity.cjs --changed` for advisory review signals.
+Code, configuration and documentation use the same policy. Size alone is not a
+failure or a reason to split; record the design review for changed large files.
+Existing safety, type, test and approval requirements remain in force.
 
-### File Size Limits
+### File naming
 
-- **250 lines:** Soft ceiling. When a file approaches this, ask yourself whether the new function belongs in a new module.
-- **400 lines:** Warning threshold. Files above this line count require a comment at the top justifying why they haven't been split.
-- **600 lines:** Hard split. Files at or above 600 lines MUST be split before the next checkpoint. No exceptions.
-
-### When To Create A New File
-
-- A new function doesn't share mutable state with the file's other functions → new file.
-- A group of 3+ related functions has emerged → extract into a dedicated module.
-- You're importing more than 8 symbols from a single module → consider splitting that module.
-- A file's purpose requires "and also" to describe → split it.
-
-### File Naming
-
-- Use kebab-case for modules: `format-date.ts`, `use-auth.ts`, `api-client.ts`.
-- Group related files in directories: `utils/`, `hooks/`, `components/`, `services/`.
-- Index files (`index.ts`) should only re-export — no implementation.
-
-### Single Responsibility
-
-Every file should have one clear purpose expressible in a single sentence. If you can't describe what a file does without a list, it should be multiple files.
+Use framework-appropriate names and group files by coherent responsibility.
 
 ## Language & Framework Rules
 
@@ -41,7 +26,7 @@ General rules that apply regardless of framework:
 
 - Prefer `const` over `let`. Never use `var`.
 - Use explicit return types on exported functions (TypeScript).
-- Keep functions under 40 lines. Extract helpers rather than nesting deeply.
+- Review long or deeply nested functions for cohesion; extract useful boundaries.
 - No `any` types in exported signatures. Use `unknown` if truly dynamic.
 - Prefer pure functions where possible. Side effects should be explicit and documented.
 - Handle errors at the boundary. Don't let exceptions propagate through layers silently.
@@ -104,11 +89,11 @@ For `handover local`, skip the publish step — the file is committed locally on
 
 ## Project-Specific Conventions
 
-These are configured in `.github/TCTBP.json` under `developmentPolicy`. Read them before generating code:
+The shared code and documentation policy is referenced by `.github/TCTBP.json` under `profile.developmentPolicy`. Read its document and JSON before generating code:
 
 - **Test framework:** {{TEST_FRAMEWORK}}
 - **Linting/formatting rules:** Configured in `package.json` scripts
 - **Module style:** ES modules (TypeScript)
 - **Code style:** Prettier + ESLint (configure when you add them)
 
-Update `.github/TCTBP.json` → `developmentPolicy` as the project's conventions evolve.
+Keep shared policy copies at the same version. Project conventions supplement the shared policy without introducing arbitrary size-only failures.

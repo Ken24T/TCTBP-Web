@@ -42,6 +42,9 @@ General rules that apply regardless of framework:
 
 ## TCTBP Workflow Awareness
 
+Follow the [TCTBP Codex skill names](../AGENTS.md#tctbp-codex-skill-names)
+convention when creating or refreshing workflow skills.
+
 This repo uses TCTBP-Web for branch safety, versioning, and deployment. Key files you should know about but not casually edit:
 
 - `.github/TCTBP.json` — machine-readable workflow policy and project profile

@@ -92,3 +92,10 @@ shared-development-policy 1.0.0. Carry both files and
 `scripts/check-modularity.cjs` together into adopting projects. Counts prompt
 review; they do not mandate a split or fail a size-only gate. Agent instructions
 and `profile.developmentPolicy` reference the same policy for code and docs.
+
+## Codex skill labels
+
+TCTBP workflow skills display as `TCTBP <Action>` while retaining their existing
+`$` invocation names and behaviour. The reconciliation prompt carries this
+convention into new and existing repositories; it does not add unsupported skills.
+Generated projects inherit the same rule in `AGENTS.md`.

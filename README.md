@@ -99,3 +99,13 @@ TCTBP workflow skills display as `TCTBP <Action>` while retaining their existing
 `$` invocation names and behaviour. The reconciliation prompt carries this
 convention into new and existing repositories; it does not add unsupported skills.
 Generated projects inherit the same rule in `AGENTS.md`.
+
+## Shared Begin
+
+Run `node scripts/tctbp-run-begin.cjs --json` for an explicit Begin request. The
+additive `.github/TCTBP_BEGIN.json` profile owns inspect/orient/resume and any
+optional project adapters. Use the pinned common core; do not fall back to
+composite resume or a generic ticket pull. Exact branch-switch and saved-work
+remote-handover approvals remain required. New scaffold projects start inspect
+only until their owner explicitly enrolls the repository and permitted mode.
+See `docs/BEGIN_CONTRACT.md`. Other workflows retain their existing guards.

@@ -100,3 +100,13 @@ The shared code and documentation policy is referenced by `.github/TCTBP.json` u
 - **Code style:** Prettier + ESLint (configure when you add them)
 
 Keep shared policy copies at the same version. Project conventions supplement the shared policy without introducing arbitrary size-only failures.
+
+## Shared Begin
+
+Run `node scripts/tctbp-run-begin.cjs --json` for an explicit Begin request. The
+additive `.github/TCTBP_BEGIN.json` profile owns inspect/orient/resume and any
+optional project adapters. Use the pinned common core; do not fall back to
+composite resume or a generic ticket pull. Exact branch-switch and saved-work
+remote-handover approvals remain required. New scaffold projects start inspect
+only until their owner explicitly enrolls the repository and permitted mode.
+See `docs/BEGIN_CONTRACT.md`. Other workflows retain their existing guards.

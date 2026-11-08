@@ -55,7 +55,7 @@ function existingRunnerBasenames() {
   const dir = path.join(projectRoot, "scripts");
   return fs
     .readdirSync(dir)
-    .filter((file) => file.startsWith("tctbp-run-") && file.endsWith(".js"));
+    .filter((file) => file.startsWith("tctbp-run-") && /\.(?:c|m)?js$/.test(file));
 }
 
 function audit() {

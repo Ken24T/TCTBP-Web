@@ -105,3 +105,15 @@ confirm the other existing skill fields and workflow files are unchanged.
 
 Carry this naming convention into the target repository's AGENTS guidance
 without replacing its existing instructions or adding unsupported workflows.
+
+## Shared Begin reconciliation
+
+Carry the complete Begin surface listed by `tctbp-managed-surface.js`, including
+the self-contained core, native skill, contract, source pin and conformance tests.
+Generate/adapt `.github/TCTBP_BEGIN.json` deliberately; never copy the template
+owner's repository identity into a consumer. Preserve existing skill frontmatter
+and YAML policy/dependency fields, other workflow settings and intentional forks.
+Default new or unsupported contexts to inspect only. Data/peer adapters are
+project-owned opt-ins; capability absence is not permission for a generic ticket
+pull. Keep exact switch and saved-work remote-handover approval and partial
+evidence. No source update by itself authorises data repair or service restart.

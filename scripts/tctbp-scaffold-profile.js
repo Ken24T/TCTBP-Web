@@ -27,6 +27,7 @@ function generateProfile(answers) {
   const contractMetadata = readContractMetadata();
 
   const profile = {
+    begin: { contract: "tctbp-begin/1", executionCommand: "node scripts/tctbp-run-begin.cjs", profile: ".github/TCTBP_BEGIN.json", owner: "TCTBP common core; project-owned capabilities" },
     schemaVersion: contractMetadata.schemaVersion,
     adviserContract: contractMetadata.adviserContract,
     adviserVocabulary: contractMetadata.adviserVocabulary,
@@ -140,6 +141,13 @@ function generateProfile(answers) {
 
   const profilePath = path.join(answers.targetPath, ".github", "TCTBP.json");
   fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2) + "\n", "utf8");
+  const source = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", ".github", "TCTBP_BEGIN_SOURCE.json"), "utf8"));
+  const beginProfile = {
+    schemaVersion: 1, contract: "tctbp-begin/1",
+    project: answers.projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "new-project",
+    mode: "inspect", repository: { remotes: [] }, data: { kind: "none" }, runtimeRelease: source.release
+  };
+  fs.writeFileSync(path.join(answers.targetPath, ".github", "TCTBP_BEGIN.json"), JSON.stringify(beginProfile, null, 2) + "\n", "utf8");
   console.log("Generated project profile.");
 }
 

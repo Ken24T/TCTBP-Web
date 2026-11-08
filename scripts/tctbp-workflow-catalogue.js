@@ -44,6 +44,16 @@ const path = require("node:path");
  */
 const PUBLIC_WORKFLOWS = [
   {
+    id: "begin",
+    displayName: "Begin",
+    runner: "scripts/tctbp-run-begin.cjs",
+    aliases: ["begin", "begin please"],
+    scaffoldManaged: true,
+    agentToken: "begin",
+    // Existing Adviser v1 vocabulary remains unchanged; Begin is an explicit entry.
+    adviserVocab: false,
+  },
+  {
     id: "status",
     displayName: "Status",
     runner: "scripts/tctbp-run-status.js",

@@ -59,6 +59,7 @@ const RUNNER_FILES = [
   "tctbp-run-rollback.js",
   "tctbp-run-runtime-advisory.js",
   "tctbp-run-orient.js",
+  "tctbp-run-begin.cjs",
   "tctbp-run-workflow.js",
   "tctbp-run-release.js",
   "tctbp-run-ticket.js",
@@ -90,7 +91,15 @@ const CONTRACT_FILES = [
   "contracts/adviser-v1/fixtures/simple-clean.json",
   "contracts/adviser-v1/fixtures/staged-dirty.json",
   "contracts/adviser-v1/fixtures/long-lived-diverged.json",
-  "docs/adviser-contract-v1.md"
+  "docs/adviser-contract-v1.md",
+  "docs/BEGIN_CONTRACT.md",
+  ".github/TCTBP_BEGIN_SOURCE.json",
+  ".agents/skills/begin/SKILL.md",
+  ".agents/skills/begin/agents/openai.yaml",
+  ...["cli.cjs", "package.json", "lib/adapters.cjs", "lib/arguments.cjs",
+    "lib/begin.cjs", "lib/continuation.cjs", "lib/git-state.cjs", "lib/process.cjs",
+    "lib/profile.cjs", "test/fixture.cjs", "test/contract.node.cjs", "test/partial-clone.node.cjs"]
+    .map(file => `scripts/tctbp-begin/${file}`)
 ];
 
 /**
@@ -98,6 +107,7 @@ const CONTRACT_FILES = [
  * Mirrors the public workflow catalogue (`tctbp-workflow-catalogue.js`).
  */
 const ACTIVATION_TRIGGERS = [
+  "begin", "begin please",
   "ship", "ship please", "shipping",
   "release", "release please", "prepare release", "prepare release please",
   "checkpoint", "checkpoint please",

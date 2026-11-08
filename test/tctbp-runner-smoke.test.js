@@ -87,7 +87,7 @@ function createRunnerFixture() {
 test("all runner sources pass node syntax checks", () => {
   const scripts = fs
     .readdirSync(path.join(projectRoot, "scripts"))
-    .filter((name) => name.endsWith(".js"));
+    .filter((name) => /\.(?:c|m)?js$/.test(name));
 
   for (const script of scripts) {
     run(process.execPath, [
